@@ -1,0 +1,28 @@
+(defconstant +bit+ 128)
+
+(defun main1 (q r)
+  (let ((n1 (ash 1 +bit+))
+        (n2 (ash 1 (* 2 +bit+)))
+        q1 r1)
+    (dotimes (x 3)
+      (setq q1 (ash 1 q))
+      (dotimes (y 3)
+        (setq r1 (logior 1 (random (ash 1 r))))
+        (multiple-value-bind (q2 r2) (truncate q1 r1)
+          (format t "16 =~X ~X =~X ~X~%"
+                  (mod q1 n2)
+                  (mod r1 n1)
+                  (mod q2 n2)
+                  (mod r2 n1)))))))
+
+(let ((*random-state* (make-random-state t)))
+  (format t "~A~%" +bit+)
+  (format t "10 =10 3 =3 1~%")
+  (main1 10 5)
+  (main1 50 20)
+  (main1 100 20)
+  (main1 100 50)
+  (main1 100 100)
+  (main1 127 100)
+  )
+
