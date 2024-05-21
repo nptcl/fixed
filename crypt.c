@@ -156,7 +156,7 @@ static void prime_random(fixed s, fixptr x, unsigned bit)
 	bit--;
 	q = bit / FIXED_FULLBIT;
 	r = bit % FIXED_FULLBIT;
-	x[q] |= (r << 1ULL);
+	x[q] |= (1ULL << r);
 }
 
 static int prime_times(fixsize bit)
@@ -301,12 +301,8 @@ static void rsa_number_d(fixed s, fixptr d, fixptr e, fixptr pq1)
 		c = b0; b0 = b1; b1 = c;
 	}
 
-	/* rem */
-	memzero_fixptr(z, word2);
-	memcpy_fixptr(z, x0, word1);
-	rem_fixptr(s, z, pq1, d);
-
 	/* minus */
+	memcpy_fixptr(d, x0, word1);
 	if (a0) {
 		/* pq1 - d */
 		sub_fixptr(pq1, d, d, word1, &ignore);
