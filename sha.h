@@ -63,6 +63,10 @@ void string_sha512encode(const char *, void *);
 /*
  *  SHA-3
  */
+/* #define FIXED_LITTLE_ENDIAN */
+/* #define FIXED_BIG_ENDIAN */
+/* #define FIXED_IGNORE_ENDIAN_CHECK */
+
 enum tail_sha3encode {
 	sha3encode_01,
 	sha3encode_11,
@@ -74,14 +78,6 @@ struct sha3encode {
 	unsigned c, dbyte, r, i, rbyte;
 	uint64_t a[25];
 };
-
-
-/*
- *  SHA-3: SHA3-256
- */
-/* #define FIXED_LITTLE_ENDIAN */
-/* #define FIXED_BIG_ENDIAN */
-/* #define FIXED_IGNORE_ENDIAN_CHECK */
 
 void init_sha3_224_encode(struct sha3encode *);
 void init_sha3_256_encode(struct sha3encode *);
