@@ -1,4 +1,4 @@
-source = main.c fixed.c crypt.c
+source = main.c fixed.c crypt.c sha.c
 object = $(source:.c=.o)
 a.out = a.out
 #CFLAGS = -g -Wall -DFIXED_DEBUG -DFIXED_8BIT
