@@ -25,7 +25,7 @@ static void power_mod_recall(fixed s, fixptr x, fixptr y, fixptr n, fixptr r)
 		rem_fixptr(s, z, n, x);
 
 		/* 2: (ash y -1) */
-		shiftdown_fixptr(y, word1, 1);
+		shiftr_fixptr(y, word1, 1);
 	}
 	pop2_fixed(s);
 }
@@ -79,7 +79,7 @@ static int prime_loop_p(fixed s, fixptr x, int k)
 
 	/* shift */
 	while ((n2[0] & 0x01) == 0)
-		shiftdown_fixptr(n2, word1, 1);
+		shiftr_fixptr(n2, word1, 1);
 
 	/* dotimes */
 	result = 1;
@@ -105,7 +105,7 @@ static int prime_loop_p(fixed s, fixptr x, int k)
 			mul_square_fixptr(c, word1, z, word2);
 			rem_fixptr(s, z, x, c);
 			/* (ash b 1) */
-			shiftup_fixptr(b, word1, 1);
+			shiftl_fixptr(b, word1, 1);
 		}
 
 		check = ((b[0] & 0x01) == 0)
@@ -149,7 +149,7 @@ static void prime_random(fixed s, fixptr x, unsigned bit)
 
 	/* bit */
 	setv_fixptr(x, word1, 1);
-	shiftup_fixptr(x, word1, bit);
+	shiftl_fixptr(x, word1, bit);
 	subv_fixptr(x, word1, 1, &ignore);
 	random_equal_fixptr(s, x, x, s->word1);
 	x[0] |= 1;

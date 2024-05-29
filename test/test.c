@@ -418,7 +418,7 @@ static int test_inc1p(void)
 	Return;
 }
 
-static int test_shiftup1(void)
+static int test_shiftl1(void)
 {
 	int x;
 	unsigned shift;
@@ -430,28 +430,28 @@ static int test_shiftup1(void)
 	s = make_fixed(1024, 100);
 	push1u_fixed(s, 100);
 	a = s->index;
-	shiftup1_fixed(s, 0, 0);
+	shiftl1_fixed(s, 0, 0);
 	b = s->index;
 	read1_compare_fixed(s, 0, "100", 10, &x);
-	test(a == b && x == 0, "shiftup1.1");
+	test(a == b && x == 0, "shiftl1.1");
 
 	set1u_fixed(s, 0, 100);
 	a = s->index;
-	shiftup1_fixed(s, 0, 1);
+	shiftl1_fixed(s, 0, 1);
 	b = s->index;
 	read1_compare_fixed(s, 0, "200", 10, &x);
-	test(a == b && x == 0, "shiftup1.2");
+	test(a == b && x == 0, "shiftl1.2");
 
 	free_fixed(s);
 
 	/* data */
-	test_file_open(&s, &file, "shiftup.txt");
+	test_file_open(&s, &file, "shiftl.txt");
 	for (;;) {
 		x = test_file_push(s, file);
 		if (x < 0)
 			break;
 		/* test */
-		printf("shiftup1: ");
+		printf("shiftl1: ");
 		output1_fixed(s, 2, stdout, 16);
 		printf(" ");
 		output1_fixed(s, 1, stdout, 16);
@@ -460,20 +460,20 @@ static int test_shiftup1(void)
 		printf("\n");
 		get1u_fixed(s, 1, &shift);
 		dup1_fixed(s, 2);
-		shiftup1_fixed(s, 0, (fixsize)shift);
+		shiftl1_fixed(s, 0, (fixsize)shift);
 		if (compare1_fixed(s, 0, 1)) {
-			test(0, "shiftup1.data");
+			test(0, "shiftl1.data");
 		}
-		pop1n_fixed(s, 1);
+		pop1_fixed(s);
 		pop1n_fixed(s, x);
 	}
 	test_file_close(s, file);
-	test(1, "shiftup1.data");
+	test(1, "shiftl1.data");
 
 	Return;
 }
 
-static int test_shiftdown1(void)
+static int test_shiftr1(void)
 {
 	int x;
 	unsigned shift;
@@ -485,28 +485,28 @@ static int test_shiftdown1(void)
 	s = make_fixed(1024, 100);
 	push1u_fixed(s, 100);
 	a = s->index;
-	shiftdown1_fixed(s, 0, 0);
+	shiftr1_fixed(s, 0, 0);
 	b = s->index;
 	read1_compare_fixed(s, 0, "100", 10, &x);
-	test(a == b && x == 0, "shiftdown1.1");
+	test(a == b && x == 0, "shiftr1.1");
 
 	set1u_fixed(s, 0, 100);
 	a = s->index;
-	shiftdown1_fixed(s, 0, 1);
+	shiftr1_fixed(s, 0, 1);
 	b = s->index;
 	read1_compare_fixed(s, 0, "50", 10, &x);
-	test(a == b && x == 0, "shiftdown1.2");
+	test(a == b && x == 0, "shiftr1.2");
 
 	free_fixed(s);
 
 	/* data */
-	test_file_open(&s, &file, "shiftdown.txt");
+	test_file_open(&s, &file, "shiftr.txt");
 	for (;;) {
 		x = test_file_push(s, file);
 		if (x < 0)
 			break;
 		/* test */
-		printf("shiftdown1: ");
+		printf("shiftr1: ");
 		output1_fixed(s, 2, stdout, 16);
 		printf(" ");
 		output1_fixed(s, 1, stdout, 16);
@@ -515,15 +515,15 @@ static int test_shiftdown1(void)
 		printf("\n");
 		get1u_fixed(s, 1, &shift);
 		dup1_fixed(s, 2);
-		shiftdown1_fixed(s, 0, (fixsize)shift);
+		shiftr1_fixed(s, 0, (fixsize)shift);
 		if (compare1_fixed(s, 0, 1)) {
-			test(0, "shiftdown1.data");
+			test(0, "shiftr1.data");
 		}
-		pop1n_fixed(s, 1);
+		pop1_fixed(s);
 		pop1n_fixed(s, x);
 	}
 	test_file_close(s, file);
-	test(1, "shiftdown1.data");
+	test(1, "shiftr1.data");
 
 	Return;
 }
@@ -742,11 +742,129 @@ static int test_power_mod(void)
 			printf("\n");
 			test(0, "power_mod.data");
 		}
-		pop1n_fixed(s, 1);
+		pop1_fixed(s);
 		pop1n_fixed(s, x);
 	}
 	test_file_close(s, file);
 	test(1, "power_mod.data");
+
+	Return;
+}
+
+static int test_rotatel(void)
+{
+	int x;
+	unsigned shift;
+	FILE *file;
+	fixed s;
+	fixptr a, b;
+
+	test_file_open(&s, &file, "rotatel.txt");
+	for (;;) {
+		x = test_file_push(s, file);
+		if (x < 0)
+			break;
+		/* test */
+		printf("rotatel: ");
+		output1_fixed(s, 2, stdout, 16);
+		printf(" ");
+		output1_fixed(s, 1, stdout, 16);
+		printf(" ");
+		output1_fixed(s, 0, stdout, 16);
+		printf("\n");
+		get1u_fixed(s, 1, &shift);
+
+		/* 1 */
+		dup1_fixed(s, 2);
+		a = top1_fixed(s);
+		rotatel1_fixptr(a, s->word1, (fixsize)shift);
+		if (compare1_fixed(s, 0, 1)) {
+			test(0, "rotatel1.data");
+		}
+		pop1_fixed(s);
+
+		/* 2 */
+		a = get1_fixed(s, 2);
+		b = push1get_fixed(s);
+		rotatel2_fixptr(a, b, s->word1, (fixsize)shift);
+		if (compare1_fixed(s, 0, 1)) {
+			test(0, "rotatel2.data");
+		}
+		pop1_fixed(s);
+
+		/* 3 */
+		dup1_fixed(s, 2);
+		a = top1_fixed(s);
+		b = push1get_fixed(s);
+		rotatel3_fixptr(a, b, s->word1, (fixsize)shift);
+		pop1_fixed(s);
+		if (compare1_fixed(s, 0, 1)) {
+			test(0, "rotatel3.data");
+		}
+		pop1_fixed(s);
+		pop1n_fixed(s, x);
+	}
+	test_file_close(s, file);
+	test(1, "rotatel.data");
+
+	Return;
+}
+
+static int test_rotater(void)
+{
+	int x;
+	unsigned shift;
+	FILE *file;
+	fixed s;
+	fixptr a, b;
+
+	test_file_open(&s, &file, "rotater.txt");
+	for (;;) {
+		x = test_file_push(s, file);
+		if (x < 0)
+			break;
+		/* test */
+		printf("rotater: ");
+		output1_fixed(s, 2, stdout, 16);
+		printf(" ");
+		output1_fixed(s, 1, stdout, 16);
+		printf(" ");
+		output1_fixed(s, 0, stdout, 16);
+		printf("\n");
+		get1u_fixed(s, 1, &shift);
+
+		/* 1 */
+		dup1_fixed(s, 2);
+		a = top1_fixed(s);
+		rotater1_fixptr(a, s->word1, (fixsize)shift);
+		if (compare1_fixed(s, 0, 1)) {
+			test(0, "rotater1.data");
+		}
+		pop1_fixed(s);
+
+		/* 2 */
+		a = get1_fixed(s, 2);
+		b = push1get_fixed(s);
+		rotater2_fixptr(a, b, s->word1, (fixsize)shift);
+		if (compare1_fixed(s, 0, 1)) {
+			test(0, "rotater2.data");
+		}
+		pop1_fixed(s);
+
+		/* 3 */
+		dup1_fixed(s, 2);
+		a = top1_fixed(s);
+		b = push1get_fixed(s);
+		rotater3_fixptr(a, b, s->word1, (fixsize)shift);
+		pop1_fixed(s);
+		if (compare1_fixed(s, 0, 1)) {
+			test(0, "rotater3.data");
+		}
+		pop1_fixed(s);
+		pop1n_fixed(s, x);
+	}
+	test_file_close(s, file);
+	test(1, "rotater.data");
 
 	Return;
 }
@@ -758,11 +876,13 @@ static int test_fixed(void)
 	TestCall(test_get1u_fixed);
 	TestCall(test_inc1s);
 	TestCall(test_inc1p);
-	TestCall(test_shiftup1);
-	TestCall(test_shiftdown1);
+	TestCall(test_shiftl1);
+	TestCall(test_shiftr1);
 	TestCall(test_div);
 	TestCall(test_rem);
 	TestCall(test_power_mod);
+	TestCall(test_rotatel);
+	TestCall(test_rotater);
 
 	return 0;
 }

@@ -174,8 +174,14 @@ void addv_fixptr(fixptr p, fixsize size, fixnum v, fixnum *carry);
 void subv_fixptr(fixptr p, fixsize size, fixnum v, fixnum *carry);
 void add_fixptr(fixptr a, fixptr b, fixptr r, fixsize size, fixnum *carry);
 void sub_fixptr(fixptr a, fixptr b, fixptr r, fixsize size, fixnum *carry);
-void shiftup_fixptr(fixptr x, fixsize size, fixsize shift);
-void shiftdown_fixptr(fixptr x, fixsize size, fixsize shift);
+void shiftl_fixptr(fixptr x, fixsize size, fixsize shift);
+void shiftr_fixptr(fixptr x, fixsize size, fixsize shift);
+void rotatel1_fixptr(fixptr r, fixsize w, fixsize m);
+void rotatel2_fixptr(fixptr x, fixptr r, fixsize w, fixsize m);
+void rotatel3_fixptr(fixptr x, fixptr y, fixsize w, fixsize m);
+void rotater1_fixptr(fixptr r, fixsize w, fixsize m);
+void rotater2_fixptr(fixptr x, fixptr r, fixsize w, fixsize m);
+void rotater3_fixptr(fixptr x, fixptr y, fixsize w, fixsize m);
 
 void setv_fixptr(fixptr x, fixsize size, fixnum v);
 int getv_fixptr(fixptr x, fixsize size, fixnum *r);
@@ -247,10 +253,10 @@ void dup2_fixed(fixed s, fixsize word1);
 void shift1_fixed(fixed s, fixsize size1, fixsize pop1);
 int compare1_fixed(fixed s, fixsize x1, fixsize y1);
 int compare2_fixed(fixed s, fixsize x1, fixsize y1);
-void shiftup1_fixed(fixed s, fixsize word1, fixsize shift);
-void shiftup2_fixed(fixed s, fixsize word1, fixsize shift);
-void shiftdown1_fixed(fixed s, fixsize word1, fixsize shift);
-void shiftdown2_fixed(fixed s, fixsize word1, fixsize shift);
+void shiftl1_fixed(fixed s, fixsize word1, fixsize shift);
+void shiftl2_fixed(fixed s, fixsize word1, fixsize shift);
+void shiftr1_fixed(fixed s, fixsize word1, fixsize shift);
+void shiftr2_fixed(fixed s, fixsize word1, fixsize shift);
 void split2_fixed(fixed s, fixsize word1);
 
 /* multiple */
@@ -305,8 +311,15 @@ void sub1s_fixed(fixed s);
 void sub1p_fixed(fixed s);
 void sub1s_reverse_fixed(fixed s);
 void sub1p_reverse_fixed(fixed s);
+
+void not_fixptr(fixptr x, fixptr r, fixsize size);
+void and_fixptr(fixptr x, fixptr y, fixptr r, fixsize size);
+void or_fixptr(fixptr x, fixptr y, fixptr r, fixsize size);
+void xor_fixptr(fixptr x, fixptr y, fixptr r, fixsize size);
+void not1_fixed(fixed s);
 void and1_fixed(fixed s);
 void or1_fixed(fixed s);
+void xor1_fixed(fixed s);
 
 #endif
 

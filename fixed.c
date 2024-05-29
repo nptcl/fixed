@@ -638,143 +638,331 @@ static void mul_pv_fixptr(fixptr p, fixsize size, fixnum v, fixnum *carry)
 		mul3_carry_fixnum(p + i, v, carry);
 }
 
-void add_fixptr(fixptr a, fixptr b, fixptr r, fixsize size, fixnum *carry)
+void add_fixptr(fixptr x, fixptr y, fixptr r, fixsize size, fixnum *carry)
 {
-	fixnum x, y, c;
+	fixnum a, b, c;
 	fixsize i;
 
 	c = 0;
 	for (i = 0; i < size; i++) {
-		add4_fixnum(a[i], b[i], &x, &y);
-		if (y) {
-			r[i] = x + c;
+		add4_fixnum(x[i], y[i], &a, &b);
+		if (b) {
+			r[i] = a + c;
 			c = 1;
 		}
 		else if (c) {
-			add4_fixnum(x, 1, &x, &c);
-			r[i] = x;
+			add4_fixnum(a, 1, &a, &c);
+			r[i] = a;
 		}
 		else {
-			r[i] = x;
+			r[i] = a;
 		}
 	}
 	*carry = c;
 }
 
-void sub_fixptr(fixptr a, fixptr b, fixptr r, fixsize size, fixnum *carry)
+void sub_fixptr(fixptr x, fixptr y, fixptr r, fixsize size, fixnum *carry)
 {
-	fixnum x, y, c;
+	fixnum a, b, c;
 	fixsize i;
 
 	c = 0;
 	for (i = 0; i < size; i++) {
-		sub4_fixnum(a[i], b[i], &x, &y);
-		if (y) {
-			r[i] = x - c;
+		sub4_fixnum(x[i], y[i], &a, &b);
+		if (b) {
+			r[i] = a - c;
 			c = 1;
 		}
 		else if (c) {
-			sub4_fixnum(x, 1, &x, &c);
-			r[i] = x;
+			sub4_fixnum(a, 1, &a, &c);
+			r[i] = a;
 		}
 		else {
-			r[i] = x;
+			r[i] = a;
 		}
 	}
 	*carry = c;
 }
 
-void shiftup_fixptr(fixptr ptr, fixsize size, fixsize shift)
+void shiftl_fixptr(fixptr x, fixsize size, fixsize shift)
 {
-	fixsize count, nshift, a, b;
-	fixnum x, y;
+	fixsize n, p, q, i, k;
+	fixnum a, b;
 
 	/* no shift */
 	if (shift == 0)
 		return;
 
 	/* zero */
-	if (zerop_fixptr(ptr, size))
+	if (zerop_fixptr(x, size))
 		return;
 
 	/* all shift */
-	count = shift / FIXED_FULLBIT;
-	shift = shift % FIXED_FULLBIT;
-	if (size <= count) {
-		memzero_fixptr(ptr, size);
+	n = shift / FIXED_FULLBIT;
+	p = shift % FIXED_FULLBIT;
+	if (size <= n) {
+		memzero_fixptr(x, size);
 		return;
 	}
 
 	/* byte shift */
-	if (shift == 0) {
-		memmove_fixptr(ptr + count, ptr, size - count);
-		memzero_fixptr(ptr, count);
+	if (p == 0) {
+		memmove_fixptr(x + n, x, size - n);
+		memzero_fixptr(x, n);
 		return;
 	}
 
 	/* byte + bit */
-	nshift = FIXED_FULLBIT - shift;
-	a = size - 1;
-	b = a - count;
-	x = ptr[b];
-	while (b) {
-		b--;
-		y = ptr[b];
-		ptr[a] = (x << shift) | (y >> nshift);
-		a--;
-		x = y;
+	q = FIXED_FULLBIT - p;
+	i = size - 1;
+	k = i - n;
+	a = x[k];
+	while (k) {
+		k--;
+		b = x[k];
+		x[i] = (a << p) | (b >> q);
+		i--;
+		a = b;
 	}
-	ptr[a] = x << shift;
-	if (a)
-		memzero_fixptr(ptr, a);
+	x[i] = a << p;
+	if (i)
+		memzero_fixptr(x, i);
 }
 
-void shiftdown_fixptr(fixptr ptr, fixsize size, fixsize shift)
+void shiftr_fixptr(fixptr x, fixsize size, fixsize shift)
 {
-	fixsize count, diff, nshift, a, b;
-	fixnum x, y;
+	fixsize n, diff, p, q, i, k;
+	fixnum a, b;
 
 	/* no shift */
 	if (shift == 0)
 		return;
 
 	/* zero */
-	if (zerop_fixptr(ptr, size))
+	if (zerop_fixptr(x, size))
 		return;
 
 	/* all shift */
-	count = shift / FIXED_FULLBIT;
-	shift = shift % FIXED_FULLBIT;
-	if (size <= count) {
-		memzero_fixptr(ptr, size);
+	n = shift / FIXED_FULLBIT;
+	p = shift % FIXED_FULLBIT;
+	if (size <= n) {
+		memzero_fixptr(x, size);
 		return;
 	}
 
 	/* byte shift */
-	if (shift == 0) {
-		diff = size - count;
-		memmove_fixptr(ptr, ptr + count, diff);
-		memzero_fixptr(ptr + diff, count);
+	if (p == 0) {
+		diff = size - n;
+		memmove_fixptr(x, x + n, diff);
+		memzero_fixptr(x + diff, n);
 		return;
 	}
 
 	/* byte + bit */
-	nshift = FIXED_FULLBIT - shift;
-	a = 0;
-	b = count;
-	x = ptr[b];
-	b++;
-	while (b < size) {
-		y = ptr[b];
-		b++;
-		ptr[a] = (x >> shift) | (y << nshift);
-		a++;
-		x = y;
+	q = FIXED_FULLBIT - p;
+	i = 0;
+	k = n;
+	a = x[k];
+	k++;
+	while (k < size) {
+		b = x[k];
+		k++;
+		x[i] = (a >> p) | (b << q);
+		i++;
+		a = b;
 	}
-	ptr[a] = x >> shift;
-	a++;
-	if (a < size)
-		memzero_fixptr(ptr + a, size - a);
+	x[i] = a >> p;
+	i++;
+	if (i < size)
+		memzero_fixptr(x + i, size - i);
+}
+
+/* rotate */
+static void rotatel1_byte_fixptr(fixptr r, fixsize w, fixsize n)
+{
+	fixsize i, w1;
+	fixnum a;
+
+	w1 = w - 1;
+	if (n < (w / 2)) {
+		/* left */
+		for (i = 0; i < n; i++) {
+			a = r[w1];
+			memcpy_fixptr(r + 1, r, w1);
+			r[0] = a;
+		}
+	}
+	else {
+		/* right */
+		n = w - n;
+		for (i = 0; i < n; i++) {
+			a = r[0];
+			memmove_fixptr(r, r + 1, w1);
+			r[w1] = a;
+		}
+	}
+}
+
+static void rotatel2_bit_fixptr(fixptr x, fixptr r, fixsize w, fixsize p)
+{
+	fixsize q, i;
+	fixnum a, b;
+
+	q = FIXED_FULLBIT - p;
+	b = x[0];
+	for (i = 1; i < w; i++) {
+		a = x[i];
+		r[i] = (a << p) | (b >> q);
+		b = a;
+	}
+	r[0] = (x[0] << p) | (b >> q);
+}
+
+static int rotatel_size_fixptr(fixsize w, fixsize m,
+		fixsize *p, fixsize *q)
+{
+	*p = (m / FIXED_FULLBIT) % w;
+	*q = m % FIXED_FULLBIT;
+	return *p == 0 && *q == 0;
+}
+
+static void rotatel1nm_fixptr(fixptr r, fixsize w, fixsize n,fixsize m)
+{
+	if (n)
+		rotatel1_byte_fixptr(r, w, n);
+	if (m)
+		rotatel2_bit_fixptr(r, r, w, m);
+}
+
+static void rotatel2_byte_fixptr(fixptr x, fixptr r, fixsize w, fixsize n)
+{
+	fixsize m;
+
+	m = w - n;
+	memcpy_fixptr(r + n, x, m);
+	memcpy_fixptr(r, x + m, n);
+}
+
+static void rotatel2_both_fixptr(fixptr x, fixptr r, fixsize w, fixsize n, fixsize p)
+{
+	fixsize i, q;
+	fixnum a, b;
+
+	q = FIXED_FULLBIT - p;
+	b = x[0];
+	n++;
+	if (w <= n)
+		n = 0;
+	for (i = 1; i < w; i++) {
+		a = x[i];
+		r[n] = (a << p) | (b >> q);
+		n++;
+		if (w <= n)
+			n = 0;
+		b = a;
+	}
+	r[n] = (x[0] << p) | (b >> q);
+}
+
+static void rotatel2nm_fixptr(fixptr x, fixptr r, fixsize w, fixsize n, fixsize m)
+{
+	if (n == 0)
+		rotatel2_bit_fixptr(x, r, w, m);
+	else if (m == 0)
+		rotatel2_byte_fixptr(x, r, w, n);
+	else
+		rotatel2_both_fixptr(x, r, w, n, m);
+}
+
+static void rotatel3_byte_fixptr(fixptr x, fixptr y, fixsize w, fixsize n)
+{
+	fixsize m;
+
+	m = w - n;
+	if (n < (w / 2)) {
+		memcpy_fixptr(y, x + m, n);
+		memmove_fixptr(x + n, x, m);
+		memcpy_fixptr(x, y, n);
+	}
+	else {
+		memcpy_fixptr(y, x, m);
+		memmove_fixptr(x, x + m, n);
+		memcpy_fixptr(x + n, y, m);
+	}
+}
+
+static void rotatel3nm_fixptr(fixptr x, fixptr y, fixsize w, fixsize n, fixsize m)
+{
+	if (n == 0)
+		rotatel2_bit_fixptr(x, x, w, m);
+	else if (m == 0)
+		rotatel3_byte_fixptr(x, y, w, n);
+	else {
+		memcpy_fixptr(y, x, w);
+		rotatel2_both_fixptr(y, x, w, n, m);
+	}
+}
+
+void rotatel1_fixptr(fixptr r, fixsize w, fixsize m)
+{
+	fixsize n;
+
+	if (! rotatel_size_fixptr(w, m, &n, &m))
+		rotatel1nm_fixptr(r, w, n, m);
+}
+
+void rotatel2_fixptr(fixptr x, fixptr r, fixsize w, fixsize m)
+{
+	fixsize n;
+
+	if (! rotatel_size_fixptr(w, m, &n, &m))
+		rotatel2nm_fixptr(x, r, w, n, m);
+}
+
+void rotatel3_fixptr(fixptr x, fixptr y, fixsize w, fixsize m)
+{
+	fixsize n;
+
+	if (! rotatel_size_fixptr(w, m, &n, &m))
+		rotatel3nm_fixptr(x, y, w, n, m);
+}
+
+static int rotater_size_fixptr(fixsize w, fixsize m,
+		fixsize *p, fixsize *q)
+{
+	fixsize right_p, right_q, right_m, left_m;
+
+	right_p = (m / FIXED_FULLBIT) % w;
+	right_q = m % FIXED_FULLBIT;
+	right_m = right_p * FIXED_FULLBIT + right_q;
+	left_m = (w * FIXED_FULLBIT) - right_m;
+	*p = (left_m / FIXED_FULLBIT) % w;
+	*q = left_m % FIXED_FULLBIT;
+	return *p == 0 && *q == 0;
+}
+
+void rotater1_fixptr(fixptr r, fixsize w, fixsize m)
+{
+	fixsize n;
+
+	if (! rotater_size_fixptr(w, m, &n, &m))
+		rotatel1nm_fixptr(r, w, n, m);
+}
+
+void rotater2_fixptr(fixptr x, fixptr r, fixsize w, fixsize m)
+{
+	fixsize n;
+
+	if (! rotater_size_fixptr(w, m, &n, &m))
+		rotatel2nm_fixptr(x, r, w, n, m);
+}
+
+void rotater3_fixptr(fixptr x, fixptr y, fixsize w, fixsize m)
+{
+	fixsize n;
+
+	if (! rotater_size_fixptr(w, m, &n, &m))
+		rotatel3nm_fixptr(x, y, w, n, m);
 }
 
 
@@ -1510,26 +1698,26 @@ int compare2_fixed(fixed s, fixsize x1, fixsize y1)
 	return compare_fixptr(x, s->word2, y, s->word2);
 }
 
-void shiftup1_fixed(fixed s, fixsize word1, fixsize shift)
+void shiftl1_fixed(fixed s, fixsize word1, fixsize shift)
 {
-	shiftup_fixptr(get1_fixed(s, word1), s->word1, shift);
+	shiftl_fixptr(get1_fixed(s, word1), s->word1, shift);
 }
 
-void shiftup2_fixed(fixed s, fixsize word1, fixsize shift)
+void shiftl2_fixed(fixed s, fixsize word1, fixsize shift)
 {
 	check2get_fixed(word1);
-	shiftup_fixptr(get1_fixed(s, word1), s->word2, shift);
+	shiftl_fixptr(get1_fixed(s, word1), s->word2, shift);
 }
 
-void shiftdown1_fixed(fixed s, fixsize word1, fixsize shift)
+void shiftr1_fixed(fixed s, fixsize word1, fixsize shift)
 {
-	shiftdown_fixptr(get1_fixed(s, word1), s->word1, shift);
+	shiftr_fixptr(get1_fixed(s, word1), s->word1, shift);
 }
 
-void shiftdown2_fixed(fixed s, fixsize word1, fixsize shift)
+void shiftr2_fixed(fixed s, fixsize word1, fixsize shift)
 {
 	check2get_fixed(word1);
-	shiftdown_fixptr(get1_fixed(s, word1), s->word2, shift);
+	shiftr_fixptr(get1_fixed(s, word1), s->word2, shift);
 }
 
 void split2_fixed(fixed s, fixsize word1)
@@ -1788,7 +1976,7 @@ static void div_copy_fixed(fixed s, fixptr q2, fixptr r1)
 		memzero_fixptr(r1 + s->sizer, diff);
 }
 
-static void div_shiftup_fixed(int shift, int nshift,
+static void div_shiftl_fixed(int shift, int nshift,
 		fixptr dst, fixptr src, fixsize size, int final)
 {
 	fixsize i;
@@ -1804,7 +1992,7 @@ static void div_shiftup_fixed(int shift, int nshift,
 		dst[i] = carry >> nshift;
 }
 
-static void div_shiftdown_fixed(int shift, int nshift, fixptr dst, fixsize size)
+static void div_shiftr_fixed(int shift, int nshift, fixptr dst, fixsize size)
 {
 	fixsize i, index;
 	fixnum carry, z;
@@ -1862,14 +2050,14 @@ static void div_shift_fixed(fixed s,
 		divrem_fixed(s);
 	}
 	else {
-		/* shiftup */
+		/* shiftl */
 		sizea = sizex + 1;
 		sizeb = sizey;
 		a = div_push_fixed(s, sizea);
 		b = div_push_fixed(s, sizeb);
 		nshift = FIXED_FULLBIT - shift;
-		div_shiftup_fixed(shift, nshift, a, x2, sizex, 1);
-		div_shiftup_fixed(shift, nshift, b, y1, sizey, 0);
+		div_shiftl_fixed(shift, nshift, a, x2, sizex, 1);
+		div_shiftl_fixed(shift, nshift, b, y1, sizey, 0);
 		sizea = size_press_fixptr(a, sizea);
 
 		/* calculate */
@@ -1883,8 +2071,8 @@ static void div_shift_fixed(fixed s,
 		s->r = div_push_fixed(s, s->sizer);
 		divrem_fixed(s);
 
-		/* shiftdown */
-		div_shiftdown_fixed(shift, nshift, s->r, s->sizer);
+		/* shiftr */
+		div_shiftr_fixed(shift, nshift, s->r, s->sizer);
 	}
 
 	/* result */
@@ -2699,33 +2887,74 @@ void sub1p_reverse_fixed(fixed s)
 	s->carry = c? 1: 0;
 }
 
-static void and0_fixed(fixptr r, fixptr x, fixsize size)
+void not_fixptr(fixptr x, fixptr r, fixsize size)
 {
 	fixsize i;
 
 	for (i = 0; i < size; i++)
-		r[i] &= x[i];
+		r[i] = ~x[i];
 }
 
-static void or0_fixed(fixptr r, fixptr x, fixsize size)
+void and_fixptr(fixptr x, fixptr y, fixptr r, fixsize size)
 {
 	fixsize i;
 
 	for (i = 0; i < size; i++)
-		r[i] |= x[i];
+		r[i] = x[i] & y[i];
+}
+
+void or_fixptr(fixptr x, fixptr y, fixptr r, fixsize size)
+{
+	fixsize i;
+
+	for (i = 0; i < size; i++)
+		r[i] = x[i] | y[i];
+}
+
+void xor_fixptr(fixptr x, fixptr y, fixptr r, fixsize size)
+{
+	fixsize i;
+
+	for (i = 0; i < size; i++)
+		r[i] = x[i] ^ y[i];
+}
+
+void not1_fixed(fixed s)
+{
+	/* x -> r */
+	not_fixptr(get1_fixed(s, 1), get1_fixed(s, 0), s->word1);
 }
 
 void and1_fixed(fixed s)
 {
+	fixptr x, r;
+
 	/* x y -> r */
-	and0_fixed(get1_fixed(s, 1), get1_fixed(s, 0), s->word1);
+	x = get1_fixed(s, 0);
+	r = get1_fixed(s, 1);
+	and_fixptr(x, x, r, s->word1);
 	pop1_fixed(s);
 }
 
 void or1_fixed(fixed s)
 {
+	fixptr x, r;
+
 	/* x y -> r */
-	or0_fixed(get1_fixed(s, 1), get1_fixed(s, 0), s->word1);
+	x = get1_fixed(s, 0);
+	r = get1_fixed(s, 1);
+	or_fixptr(x, x, r, s->word1);
+	pop1_fixed(s);
+}
+
+void xor1_fixed(fixed s)
+{
+	fixptr x, r;
+
+	/* x y -> r */
+	x = get1_fixed(s, 0);
+	r = get1_fixed(s, 1);
+	xor_fixptr(x, x, r, s->word1);
 	pop1_fixed(s);
 }
 
