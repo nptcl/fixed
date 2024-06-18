@@ -31,8 +31,34 @@ static void init_sha32encode(struct sha32encode *ptr,
 	sha32_clear_w(ptr->w);
 }
 
-static void byte_sha32encode(void (*next)(struct sha32encode *),
-		struct sha32encode *ptr, uint8_t v)
+typedef void (*calltype_next_sha32encode)(struct sha32encode *);
+typedef void (*calltype_byte0_sha32encode)(struct sha32encode *, uint8_t);
+typedef void (*calltype_byte_sha32encode)(struct sha32encode *, uint8_t,
+		calltype_next_sha32encode);
+
+static void byte1_sha32encode(struct sha32encode *ptr, uint8_t v,
+		calltype_next_sha32encode next)
+{
+	unsigned i, x, y;
+
+	/* push */
+	i = ptr->i;
+	x = i / sizeof(uint32_t);
+	y = i % sizeof(uint32_t);
+	ptr->w[x] |= ((uint32_t)v) << (y * 8UL);
+	i++;
+
+	/* next */
+	if (64 <= i) {
+		(*next)(ptr);
+		i = 0;
+	}
+	ptr->i = i;
+	ptr->s += 8;
+}
+
+static void byte2_sha32encode(struct sha32encode *ptr, uint8_t v,
+		calltype_next_sha32encode next)
 {
 	unsigned i, x, y;
 
@@ -53,8 +79,8 @@ static void byte_sha32encode(void (*next)(struct sha32encode *),
 	ptr->s += 8;
 }
 
-static void read_sha32encode(void (*byte)(struct sha32encode *, uint8_t),
-		struct sha32encode *ptr, const void *pvoid, size_t size)
+static void read_sha32encode(struct sha32encode *ptr, const void *pvoid, size_t size,
+		calltype_byte0_sha32encode byte)
 {
 	const uint8_t *p;
 	size_t i;
@@ -64,8 +90,9 @@ static void read_sha32encode(void (*byte)(struct sha32encode *, uint8_t),
 		(*byte)(ptr, p[i]);
 }
 
-static void finish_sha32encode(void (*next)(struct sha32encode *),
-		struct sha32encode *ptr)
+static void finish_sha32encode(struct sha32encode *ptr, int is_sha,
+		calltype_byte_sha32encode byte,
+		calltype_next_sha32encode next)
 {
 	unsigned i;
 	uint32_t s1, s2;
@@ -76,35 +103,221 @@ static void finish_sha32encode(void (*next)(struct sha32encode *),
 	s2 = (uint32_t)(s & 0xFFFFFFFFUL);
 
 	/* need 64bit -> 8byte */
-	byte_sha32encode(next, ptr, 0x80);
+	(*byte)(ptr, 0x80, next);
 	i = ptr->i;
-	if ((64 - 8) <= i) {
+	if ((64 - 8) < i) {
 		(*next)(ptr);
 		i = 0;
 	}
-	ptr->w[16 - 2] = s1;
-	ptr->w[16 - 1] = s2;
+	if (is_sha) {
+		ptr->w[16 - 2] = s1;
+		ptr->w[16 - 1] = s2;
+	}
+	else {
+		ptr->w[16 - 2] = s2;
+		ptr->w[16 - 1] = s1;
+	}
 	(*next)(ptr);
 }
 
-void calc_sha32encode(void (*next)(struct sha32encode *),
-		struct sha32encode *ptr, void *pvoid, int size)
+static void calc_sha32encode(struct sha32encode *ptr, void *pvoid,
+		calltype_byte_sha32encode byte,
+		calltype_next_sha32encode next,
+		int size, int is_sha)
 {
 	int x, y, z, k;
 	uint8_t *p;
 	uint32_t *h, v;
 
-	finish_sha32encode(next, ptr);
+	finish_sha32encode(ptr, is_sha, byte, next);
 	p = (uint8_t *)pvoid;
 	h = ptr->h;
 	k = 0;
-	for (x = 0; x < size; x++) {
-		v = h[x];
-		for (y = 0; y < sizeof(uint32_t); y++) {
-			z = sizeof(uint32_t) - y - 1UL;
-			p[k++] = (v >> (z * 8)) & 0xFFU;
+	if (is_sha) {
+		for (x = 0; x < size; x++) {
+			v = h[x];
+			for (y = 0; y < sizeof(uint32_t); y++) {
+				z = sizeof(uint32_t) - y - 1UL;
+				p[k++] = (v >> (z * 8)) & 0xFFU;
+			}
 		}
 	}
+	else {
+		for (x = 0; x < size; x++) {
+			v = h[x];
+			for (y = 0; y < sizeof(uint32_t); y++)
+				p[k++] = (v >> (y * 8)) & 0xFFU;
+		}
+	}
+}
+
+
+/*
+ *  MD5
+ */
+static const uint32_t Md5Encode_CalcT[64 + 1] = {
+	0x00000000UL,
+	0xD76AA478UL, 0xE8C7B756UL, 0x242070DBUL, 0xC1BDCEEEUL,
+	0xF57C0FAFUL, 0x4787C62AUL, 0xA8304613UL, 0xFD469501UL,
+	0x698098D8UL, 0x8B44F7AFUL, 0xFFFF5BB1UL, 0x895CD7BEUL,
+	0x6B901122UL, 0xFD987193UL, 0xA679438EUL, 0x49B40821UL,
+	0xF61E2562UL, 0xC040B340UL, 0x265E5A51UL, 0xE9B6C7AAUL,
+	0xD62F105DUL, 0x02441453UL, 0xD8A1E681UL, 0xE7D3FBC8UL,
+	0x21E1CDE6UL, 0xC33707D6UL, 0xF4D50D87UL, 0x455A14EDUL,
+	0xA9E3E905UL, 0xFCEFA3F8UL, 0x676F02D9UL, 0x8D2A4C8AUL,
+	0xFFFA3942UL, 0x8771F681UL, 0x6D9D6122UL, 0xFDE5380CUL,
+	0xA4BEEA44UL, 0x4BDECFA9UL, 0xF6BB4B60UL, 0xBEBFBC70UL,
+	0x289B7EC6UL, 0xEAA127FAUL, 0xD4EF3085UL, 0x04881D05UL,
+	0xD9D4D039UL, 0xE6DB99E5UL, 0x1FA27CF8UL, 0xC4AC5665UL,
+	0xF4292244UL, 0x432AFF97UL, 0xAB9423A7UL, 0xFC93A039UL,
+	0x655B59C3UL, 0x8F0CCC92UL, 0xFFEFF47DUL, 0x85845DD1UL,
+	0x6FA87E4FUL, 0xFE2CE6E0UL, 0xA3014314UL, 0x4E0811A1UL,
+	0xF7537E82UL, 0xBD3AF235UL, 0x2AD7D2BBUL, 0xEB86D391UL
+};
+
+#define Md5Encode_CalcF(x,y,z) (((x) & (y)) | ((~(x)) & (z)))
+#define Md5Encode_CalcG(x,y,z) (((x) & (z)) | ((y) & (~(z))))
+#define Md5Encode_CalcH(x,y,z) ((x) ^ (y) ^ (z))
+#define Md5Encode_CalcI(x,y,z) ((y) ^ ((x) | (~(z))))
+#define Md5Encode_Calc(op,w,a,b,c,d,k,s,i) { \
+	a += Md5Encode_Calc##op(b,c,d) + w[k] + Md5Encode_CalcT[i]; \
+	a = sha32_rotl(a, s); \
+	a += b; \
+}
+
+static const uint32_t md5_h[8] = {
+	0x67452301UL, 0xEFCDAB89UL, 0x98BADCFEUL, 0x10325476UL,
+	0x00000000UL, 0x00000000UL, 0x00000000UL, 0x00000000UL
+};
+
+void init_md5encode(struct sha32encode *ptr)
+{
+	init_sha32encode(ptr, md5_h, BYTE_MD5ENCODE);
+}
+
+static void next_md5encode(struct sha32encode *ptr)
+{
+	uint32_t a, b, c, d, *w;
+
+	a = ptr->h[0];
+	b = ptr->h[1];
+	c = ptr->h[2];
+	d = ptr->h[3];
+	w = ptr->w;
+
+	/* Round 1. */
+	Md5Encode_Calc(F,w, a,b,c,d,  0,  7,  1);
+	Md5Encode_Calc(F,w, d,a,b,c,  1, 12,  2);
+	Md5Encode_Calc(F,w, c,d,a,b,  2, 17,  3);
+	Md5Encode_Calc(F,w, b,c,d,a,  3, 22,  4);
+	Md5Encode_Calc(F,w, a,b,c,d,  4,  7,  5);
+	Md5Encode_Calc(F,w, d,a,b,c,  5, 12,  6);
+	Md5Encode_Calc(F,w, c,d,a,b,  6, 17,  7);
+	Md5Encode_Calc(F,w, b,c,d,a,  7, 22,  8);
+	Md5Encode_Calc(F,w, a,b,c,d,  8,  7,  9);
+	Md5Encode_Calc(F,w, d,a,b,c,  9, 12, 10);
+	Md5Encode_Calc(F,w, c,d,a,b, 10, 17, 11);
+	Md5Encode_Calc(F,w, b,c,d,a, 11, 22, 12);
+	Md5Encode_Calc(F,w, a,b,c,d, 12,  7, 13);
+	Md5Encode_Calc(F,w, d,a,b,c, 13, 12, 14);
+	Md5Encode_Calc(F,w, c,d,a,b, 14, 17, 15);
+	Md5Encode_Calc(F,w, b,c,d,a, 15, 22, 16);
+
+	/* Round 2. */
+	Md5Encode_Calc(G,w, a,b,c,d,  1,  5, 17);
+	Md5Encode_Calc(G,w, d,a,b,c,  6,  9, 18);
+	Md5Encode_Calc(G,w, c,d,a,b, 11, 14, 19);
+	Md5Encode_Calc(G,w, b,c,d,a,  0, 20, 20);
+	Md5Encode_Calc(G,w, a,b,c,d,  5,  5, 21);
+	Md5Encode_Calc(G,w, d,a,b,c, 10,  9, 22);
+	Md5Encode_Calc(G,w, c,d,a,b, 15, 14, 23);
+	Md5Encode_Calc(G,w, b,c,d,a,  4, 20, 24);
+	Md5Encode_Calc(G,w, a,b,c,d,  9,  5, 25);
+	Md5Encode_Calc(G,w, d,a,b,c, 14,  9, 26);
+	Md5Encode_Calc(G,w, c,d,a,b,  3, 14, 27);
+	Md5Encode_Calc(G,w, b,c,d,a,  8, 20, 28);
+	Md5Encode_Calc(G,w, a,b,c,d, 13,  5, 29);
+	Md5Encode_Calc(G,w, d,a,b,c,  2,  9, 30);
+	Md5Encode_Calc(G,w, c,d,a,b,  7, 14, 31);
+	Md5Encode_Calc(G,w, b,c,d,a, 12, 20, 32);
+
+	/* Round 3. */
+	Md5Encode_Calc(H,w, a,b,c,d,  5,  4, 33);
+	Md5Encode_Calc(H,w, d,a,b,c,  8, 11, 34);
+	Md5Encode_Calc(H,w, c,d,a,b, 11, 16, 35);
+	Md5Encode_Calc(H,w, b,c,d,a, 14, 23, 36);
+	Md5Encode_Calc(H,w, a,b,c,d,  1,  4, 37);
+	Md5Encode_Calc(H,w, d,a,b,c,  4, 11, 38);
+	Md5Encode_Calc(H,w, c,d,a,b,  7, 16, 39);
+	Md5Encode_Calc(H,w, b,c,d,a, 10, 23, 40);
+	Md5Encode_Calc(H,w, a,b,c,d, 13,  4, 41);
+	Md5Encode_Calc(H,w, d,a,b,c,  0, 11, 42);
+	Md5Encode_Calc(H,w, c,d,a,b,  3, 16, 43);
+	Md5Encode_Calc(H,w, b,c,d,a,  6, 23, 44);
+	Md5Encode_Calc(H,w, a,b,c,d,  9,  4, 45);
+	Md5Encode_Calc(H,w, d,a,b,c, 12, 11, 46);
+	Md5Encode_Calc(H,w, c,d,a,b, 15, 16, 47);
+	Md5Encode_Calc(H,w, b,c,d,a,  2, 23, 48);
+
+	/* Round 4. */
+	Md5Encode_Calc(I,w, a,b,c,d,  0,  6, 49);
+	Md5Encode_Calc(I,w, d,a,b,c,  7, 10, 50);
+	Md5Encode_Calc(I,w, c,d,a,b, 14, 15, 51);
+	Md5Encode_Calc(I,w, b,c,d,a,  5, 21, 52);
+	Md5Encode_Calc(I,w, a,b,c,d, 12,  6, 53);
+	Md5Encode_Calc(I,w, d,a,b,c,  3, 10, 54);
+	Md5Encode_Calc(I,w, c,d,a,b, 10, 15, 55);
+	Md5Encode_Calc(I,w, b,c,d,a,  1, 21, 56);
+	Md5Encode_Calc(I,w, a,b,c,d,  8,  6, 57);
+	Md5Encode_Calc(I,w, d,a,b,c, 15, 10, 58);
+	Md5Encode_Calc(I,w, c,d,a,b,  6, 15, 59);
+	Md5Encode_Calc(I,w, b,c,d,a, 13, 21, 60);
+	Md5Encode_Calc(I,w, a,b,c,d,  4,  6, 61);
+	Md5Encode_Calc(I,w, d,a,b,c, 11, 10, 62);
+	Md5Encode_Calc(I,w, c,d,a,b,  2, 15, 63);
+	Md5Encode_Calc(I,w, b,c,d,a,  9, 21, 64);
+
+	ptr->h[0] += a;
+	ptr->h[1] += b;
+	ptr->h[2] += c;
+	ptr->h[3] += d;
+
+	/* clear w */
+	sha32_clear_w(w);
+}
+
+void byte_md5encode(struct sha32encode *ptr, uint8_t v)
+{
+	byte1_sha32encode(ptr, v, next_md5encode);
+}
+
+void read_md5encode(struct sha32encode *ptr, const void *pvoid, size_t size)
+{
+	read_sha32encode(ptr, pvoid, size, byte_md5encode);
+}
+
+void finish_md5encode(struct sha32encode *ptr)
+{
+	finish_sha32encode(ptr, 0, byte1_sha32encode, next_md5encode);
+}
+
+void calc_md5encode(struct sha32encode *ptr, void *pvoid)
+{
+	calc_sha32encode(ptr, pvoid, byte1_sha32encode, next_md5encode, 4, 0);
+}
+
+void sequence_md5encode(const void *from, size_t len, void *result)
+{
+	struct sha32encode md5;
+
+	init_md5encode(&md5);
+	read_md5encode(&md5, from, len);
+	calc_md5encode(&md5, result);
+}
+
+void string_md5encode(const char *from, void *result)
+{
+	sequence_md5encode(from, strlen(from), result);
 }
 
 
@@ -123,7 +336,7 @@ static const uint32_t sha1_h[8] = {
 
 void init_sha1encode(struct sha32encode *ptr)
 {
-	init_sha32encode(ptr, sha1_h, BYTE_SHA160ENCODE);
+	init_sha32encode(ptr, sha1_h, BYTE_SHA1ENCODE);
 }
 
 static inline uint32_t sha1_w(const uint32_t *w, int s)
@@ -204,22 +417,22 @@ static void next_sha1encode(struct sha32encode *ptr)
 
 void byte_sha1encode(struct sha32encode *ptr, uint8_t v)
 {
-	byte_sha32encode(next_sha1encode, ptr, v);
+	byte2_sha32encode(ptr, v, next_sha1encode);
 }
 
 void read_sha1encode(struct sha32encode *ptr, const void *pvoid, size_t size)
 {
-	read_sha32encode(byte_sha1encode, ptr, pvoid, size);
+	read_sha32encode(ptr, pvoid, size, byte_sha1encode);
 }
 
 void finish_sha1encode(struct sha32encode *ptr)
 {
-	finish_sha32encode(next_sha1encode, ptr);
+	finish_sha32encode(ptr, 1, byte2_sha32encode, next_sha1encode);
 }
 
 void calc_sha1encode(struct sha32encode *ptr, void *pvoid)
 {
-	calc_sha32encode(next_sha1encode, ptr, pvoid, 5);
+	calc_sha32encode(ptr, pvoid, byte2_sha32encode, next_sha1encode, 5, 1);
 }
 
 void sequence_sha1encode(const void *from, size_t len, void *result)
@@ -292,9 +505,9 @@ static inline uint32_t sigma32_lower_1(uint32_t x)
 static inline uint32_t sha256_w(const uint32_t *w, int s)
 {
 	return sigma32_lower_1(w[(s + 14) & 0x0F]) +
-			w[(s + 9) & 0x0F] +
-			sigma32_lower_0(w[(s + 1) & 0x0F]) +
-			w[s];
+		w[(s + 9) & 0x0F] +
+		sigma32_lower_0(w[(s + 1) & 0x0F]) +
+		w[s];
 }
 
 #define sha256_abcdefgh(a, b, c, d, e, f, g, h, t1, t2) { \
@@ -356,22 +569,22 @@ static void next_sha256encode(struct sha32encode *ptr)
 
 void byte_sha256encode(struct sha32encode *ptr, uint8_t v)
 {
-	byte_sha32encode(next_sha256encode, ptr, v);
+	byte2_sha32encode(ptr, v, next_sha256encode);
 }
 
 void read_sha256encode(struct sha32encode *ptr, const void *pvoid, size_t size)
 {
-	read_sha32encode(byte_sha256encode, ptr, pvoid, size);
+	read_sha32encode(ptr, pvoid, size, byte_sha256encode);
 }
 
 void finish_sha256encode(struct sha32encode *ptr)
 {
-	finish_sha32encode(next_sha256encode, ptr);
+	finish_sha32encode(ptr, 1, byte2_sha32encode, next_sha256encode);
 }
 
 void calc_sha256encode(struct sha32encode *ptr, void *pvoid)
 {
-	calc_sha32encode(next_sha256encode, ptr, pvoid, 8);
+	calc_sha32encode(ptr, pvoid, byte2_sha32encode, next_sha256encode, 8, 1);
 }
 
 void sequence_sha256encode(const void *from, size_t len, void *result)
@@ -509,7 +722,7 @@ static void finish_sha64encode(void (*next)(struct sha64encode *),
 	/* need 128bit -> 16byte */
 	byte_sha64encode(next, ptr, 0x80);
 	i = ptr->i;
-	if ((128 - 16) <= i) {
+	if ((128 - 16) < i) {
 		(*next)(ptr);
 		i = 0;
 	}
@@ -577,9 +790,9 @@ static inline uint64_t sigma64_lower_1(uint64_t x)
 static inline uint64_t sha512_w(const uint64_t *w, int s)
 {
 	return sigma64_lower_1(w[(s + 14) & 0x0F]) +
-			w[(s + 9) & 0x0F] +
-			sigma64_lower_0(w[(s + 1) & 0x0F]) +
-			w[s];
+		w[(s + 9) & 0x0F] +
+		sigma64_lower_0(w[(s + 1) & 0x0F]) +
+		w[s];
 }
 
 #define sha512_abcdefgh(a, b, c, d, e, f, g, h, t1, t2) { \
@@ -616,7 +829,7 @@ static void next_sha512encode(struct sha64encode *ptr)
 		sha512_abcdefgh(a, b, c, d, e, f, g, h, t1, t2);
 	}
 
-	/* 16 - 63 */
+	/* 16 - 79 */
 	for (i = 16; i < 80; i++) {
 		s = i & 0x0F;
 		w[s] = sha512_w(w, s);
@@ -677,19 +890,19 @@ void string_sha512encode(const char *from, void *result)
 /*
  *  SHA-3: keccak
  */
-#if defined(FIXED_LITTLE_ENDIAN)
-#undef FIXED_BIG_ENDIAN
-#elif defined(FIXED_BIG_ENDIAN)
-#undef FIXED_LITTLE_ENDIAN
+#if defined(SHA3_LITTLE_ENDIAN)
+#undef SHA3_BIG_ENDIAN
+#elif defined(SHA3_BIG_ENDIAN)
+#undef SHA3_LITTLE_ENDIAN
 #else
 /* default -> LITTLE_ENDIAN */
-#define FIXED_LITTLE_ENDIAN
-#undef FIXED_BIG_ENDIAN
+#define SHA3_LITTLE_ENDIAN
+#undef SHA3_BIG_ENDIAN
 #endif
 
 #define sha3_xy(x, y)			(5*(y) + (x))
 
-#ifdef FIXED_LITTLE_ENDIAN
+#ifdef SHA3_LITTLE_ENDIAN
 #define sha3_load64(a,n)		((a)[n])
 #define sha3_store64(a,n,v)		((a)[n] = (v))
 #define sha3_xor64(a,n,v)		((a)[n] ^= (v))
@@ -701,13 +914,15 @@ void string_sha512encode(const char *from, void *result)
 
 static inline uint64_t sha3_swap_load64(const uint8_t *a)
 {
-	int i, k;
+	int i;
 	uint64_t v;
 
-	v = 0;
-	for (i = 0; i < sizeof(uint64_t); i++) {
-		k = sizeof(uint64_t) - i - 1;
-		v |= ((uint64_t)a[k]) << (i * 8ULL);
+	v = a[sizeof(uint64_t) - 1];
+	for (i = sizeof(uint64_t) - 2; ; i--) {
+		v <<= 8ULL;
+		v |= a[i];
+		if (i == 0)
+			break;
 	}
 
 	return v;
@@ -717,25 +932,29 @@ static inline void sha3_swap_store64(uint8_t *a, uint64_t v)
 {
 	int i;
 
-	for (i = 0; i < sizeof(uint64_t); i++)
-		a[i] = (uint8_t)((v >> (i * 8U)) & 0xFFU);
+	for (i = 0; i < sizeof(uint64_t); i++) {
+		a[i] = (uint8_t)(v & 0xFFU);
+		v >>= 8ULL;
+	}
 }
 
 static inline void sha3_swap_xor64(uint8_t *a, uint64_t v)
 {
 	int i;
 
-	for (i = 0; i < sizeof(uint64_t); i++)
-		a[i] ^= (uint8_t)((v >> (i * 8U)) & 0xFFU);
+	for (i = 0; i < sizeof(uint64_t); i++) {
+		a[i] ^= (uint8_t)(v & 0xFFU);
+		v >>= 8ULL;
+	}
 }
 #endif
 
 static const unsigned rho_sha3encode[25] = {
-	 0,  1, 62, 28, 27,
-	36, 44,  6, 55, 20,
-	 3, 10, 43, 25, 39,
-	41, 45, 15, 21,  8,
-	18,  2, 61, 56, 14
+	0,  1,  62, 28, 27,
+	36, 44, 6,  55, 20,
+	3,  10, 43, 25, 39,
+	41, 45, 15, 21, 8,
+	18, 2,  61, 56, 14
 };
 
 static const uint64_t rc_sha3encode[24] = {
@@ -909,7 +1128,7 @@ void calc_sha3encode(struct sha3encode *ptr, void *pvoid)
 /*
  *  SHA-3: init
  */
-#ifndef FIXED_IGNORE_ENDIAN_CHECK
+#ifndef SHA3_IGNORE_ENDIAN_CHECK
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -921,14 +1140,14 @@ static void endian_check_sha3encode(void)
 	} u;
 
 	u.y = 1;
-#ifdef FIXED_LITTLE_ENDIAN
+#ifdef SHA3_LITTLE_ENDIAN
 	if (u.x[0] == 0) {
-		fprintf(stderr, "endian error, Add #define FIXED_BIG_ENDIAN.\n");
+		fprintf(stderr, "endian error, Add #define SHA3_BIG_ENDIAN.\n");
 		exit(1);
 	}
 #else
 	if (u.x[0] != 0) {
-		fprintf(stderr, "endian error, Add #define FIXED_LITTLE_ENDIAN.\n");
+		fprintf(stderr, "endian error, Add #define SHA3_LITTLE_ENDIAN.\n");
 		exit(1);
 	}
 #endif
@@ -938,7 +1157,7 @@ static void endian_check_sha3encode(void)
 static void init_sha3encode(struct sha3encode *ptr,
 		unsigned cbit, unsigned dbit, enum tail_sha3encode tail)
 {
-#ifndef FIXED_IGNORE_ENDIAN_CHECK
+#ifndef SHA3_IGNORE_ENDIAN_CHECK
 	endian_check_sha3encode();
 #endif
 	memset(ptr->a, 0, sizeof(uint64_t) * 25);

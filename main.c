@@ -8,7 +8,7 @@
 static void output_main(fixed s, fixsize word1, const char *x)
 {
 	printf("%s", x);
-	output1_fixed(s, word1, stdout, 16);
+	print1_fixed(s, word1, stdout, 16);
 	printf("\n");
 }
 

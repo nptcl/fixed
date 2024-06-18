@@ -355,9 +355,9 @@ static int test_inc1s(void)
 			break;
 		/* test */
 		printf("inc1s: ");
-		output1_fixed(s, 1, stdout, 16);
+		print1_fixed(s, 1, stdout, 16);
 		printf(" ");
-		output1_fixed(s, 0, stdout, 16);
+		print1_fixed(s, 0, stdout, 16);
 		printf("\n");
 		dup1_fixed(s, 1);
 		inc1s_fixed(s);
@@ -400,9 +400,9 @@ static int test_inc1p(void)
 			break;
 		/* test */
 		printf("inc1p: ");
-		output1_fixed(s, 1, stdout, 16);
+		print1_fixed(s, 1, stdout, 16);
 		printf(" ");
-		output1_fixed(s, 0, stdout, 16);
+		print1_fixed(s, 0, stdout, 16);
 		printf("\n");
 		dup1_fixed(s, 1);
 		inc1p_fixed(s);
@@ -452,11 +452,11 @@ static int test_shiftl1(void)
 			break;
 		/* test */
 		printf("shiftl1: ");
-		output1_fixed(s, 2, stdout, 16);
+		print1_fixed(s, 2, stdout, 16);
 		printf(" ");
-		output1_fixed(s, 1, stdout, 16);
+		print1_fixed(s, 1, stdout, 16);
 		printf(" ");
-		output1_fixed(s, 0, stdout, 16);
+		print1_fixed(s, 0, stdout, 16);
 		printf("\n");
 		get1u_fixed(s, 1, &shift);
 		dup1_fixed(s, 2);
@@ -507,11 +507,11 @@ static int test_shiftr1(void)
 			break;
 		/* test */
 		printf("shiftr1: ");
-		output1_fixed(s, 2, stdout, 16);
+		print1_fixed(s, 2, stdout, 16);
 		printf(" ");
-		output1_fixed(s, 1, stdout, 16);
+		print1_fixed(s, 1, stdout, 16);
 		printf(" ");
-		output1_fixed(s, 0, stdout, 16);
+		print1_fixed(s, 0, stdout, 16);
 		printf("\n");
 		get1u_fixed(s, 1, &shift);
 		dup1_fixed(s, 2);
@@ -635,13 +635,13 @@ static int test_div(void)
 			break;
 		/* test */
 		printf("div: ");
-		output2_fixed(s, 5, stdout, 16); /* x2 */
+		print2_fixed(s, 5, stdout, 16); /* x2 */
 		printf(" ");
-		output1_fixed(s, 3, stdout, 16); /* y1 */
+		print1_fixed(s, 3, stdout, 16); /* y1 */
 		printf(" ");
-		output2_fixed(s, 2, stdout, 16); /* q2 */
+		print2_fixed(s, 2, stdout, 16); /* q2 */
 		printf(" ");
-		output1_fixed(s, 0, stdout, 16); /* r1 */
+		print1_fixed(s, 0, stdout, 16); /* r1 */
 		printf("\n");
 
 		dup2_fixed(s, 5);    /* 2: q2 */
@@ -722,13 +722,13 @@ static int test_power_mod(void)
 			break;
 		/* test */
 		printf("power_mod: ");
-		output1_fixed(s, 3, stdout, 16);  /* x */
+		print1_fixed(s, 3, stdout, 16);  /* x */
 		printf(" ");
-		output1_fixed(s, 2, stdout, 16);  /* y */
+		print1_fixed(s, 2, stdout, 16);  /* y */
 		printf(" ");
-		output1_fixed(s, 1, stdout, 16);  /* n */
+		print1_fixed(s, 1, stdout, 16);  /* n */
 		printf(" ");
-		output1_fixed(s, 0, stdout, 16);  /* r */
+		print1_fixed(s, 0, stdout, 16);  /* r */
 		printf("\n");
 
 		dup1_fixed(s, 3);  /* x */
@@ -736,9 +736,9 @@ static int test_power_mod(void)
 		dup1_fixed(s, 3);  /* n */
 		power_mod_fixed(s);
 		if (compare1_fixed(s, 0, 1)) {
-			output1_fixed(s, 0, stdout, 16);
+			print1_fixed(s, 0, stdout, 16);
 			printf("\n");
-			output1_fixed(s, 1, stdout, 16);
+			print1_fixed(s, 1, stdout, 16);
 			printf("\n");
 			test(0, "power_mod.data");
 		}
@@ -766,11 +766,11 @@ static int test_rotatel(void)
 			break;
 		/* test */
 		printf("rotatel: ");
-		output1_fixed(s, 2, stdout, 16);
+		print1_fixed(s, 2, stdout, 16);
 		printf(" ");
-		output1_fixed(s, 1, stdout, 16);
+		print1_fixed(s, 1, stdout, 16);
 		printf(" ");
-		output1_fixed(s, 0, stdout, 16);
+		print1_fixed(s, 0, stdout, 16);
 		printf("\n");
 		get1u_fixed(s, 1, &shift);
 
@@ -825,11 +825,11 @@ static int test_rotater(void)
 			break;
 		/* test */
 		printf("rotater: ");
-		output1_fixed(s, 2, stdout, 16);
+		print1_fixed(s, 2, stdout, 16);
 		printf(" ");
-		output1_fixed(s, 1, stdout, 16);
+		print1_fixed(s, 1, stdout, 16);
 		printf(" ");
-		output1_fixed(s, 0, stdout, 16);
+		print1_fixed(s, 0, stdout, 16);
 		printf("\n");
 		get1u_fixed(s, 1, &shift);
 

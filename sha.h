@@ -13,6 +13,8 @@
 #define BYTE_SHA256ENCODE		(256 / 8)
 #define BYTE_SHA384ENCODE		(384 / 8)
 #define BYTE_SHA512ENCODE		(512 / 8)
+#define BYTE_MD5ENCODE			BYTE_SHA128ENCODE
+#define BYTE_SHA1ENCODE			BYTE_SHA160ENCODE
 
 struct sha32encode {
 	unsigned i, dbyte;
@@ -25,6 +27,17 @@ struct sha64encode {
 	uint64_t h[8], w[16];
 	size_t s;
 };
+
+
+/*
+ *  MD5
+ */
+void init_md5encode(struct sha32encode *);
+void byte_md5encode(struct sha32encode *, uint8_t);
+void read_md5encode(struct sha32encode *, const void *, size_t);
+void calc_md5encode(struct sha32encode *, void *);
+void sequence_md5encode(const void *, size_t, void *);
+void string_md5encode(const char *, void *);
 
 
 /*
@@ -63,9 +76,9 @@ void string_sha512encode(const char *, void *);
 /*
  *  SHA-3
  */
-/* #define FIXED_LITTLE_ENDIAN */
-/* #define FIXED_BIG_ENDIAN */
-/* #define FIXED_IGNORE_ENDIAN_CHECK */
+/* #define SHA3_LITTLE_ENDIAN */
+/* #define SHA3_BIG_ENDIAN */
+/* #define SHA3_IGNORE_ENDIAN_CHECK */
 
 enum tail_sha3encode {
 	sha3encode_01,

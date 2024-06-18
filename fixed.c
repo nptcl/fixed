@@ -629,7 +629,7 @@ void subv_fixptr(fixptr p, fixsize size, fixnum v, fixnum *carry)
 	*carry = v;
 }
 
-static void mul_pv_fixptr(fixptr p, fixsize size, fixnum v, fixnum *carry)
+void mulv_fixptr(fixptr p, fixsize size, fixnum v, fixnum *carry)
 {
 	fixsize i;
 
@@ -657,6 +657,22 @@ void add_fixptr(fixptr x, fixptr y, fixptr r, fixsize size, fixnum *carry)
 		else {
 			r[i] = a;
 		}
+	}
+	*carry = c;
+}
+
+void sub2_fixptr(fixptr a, fixsize size1, fixptr b, fixsize size2,
+		fixptr r, fixsize size3, fixnum *carry)
+{
+	fixnum x, y, c;
+	fixsize i;
+
+	c = 0;
+	for (i = 0; i < size3; i++) {
+		x = (i < size1)? a[i]: 0;
+		y = (i < size1)? b[i]: 0;
+		sub3_carry_fixnum(&x, y, &c);
+		r[i] = x;
 	}
 	*carry = c;
 }
@@ -2289,7 +2305,7 @@ static int readset_char_fixed(fixsize size, fixnum r, fixptr x, fixnum y)
 
 	/* x*r -> x */
 	check = 0;
-	mul_pv_fixptr(x, size, r, &carry);
+	mulv_fixptr(x, size, r, &carry);
 	if (carry)
 		check = 1;
 
@@ -2668,7 +2684,7 @@ void file_fixprint(fixprint print, FILE *file)
 	file_fixed_print_child(print->root, file);
 }
 
-int output1_fixed(fixed s, fixsize word1, FILE *file, unsigned radix)
+int print1_fixed(fixed s, fixsize word1, FILE *file, unsigned radix)
 {
 	fixprint print;
 
@@ -2681,7 +2697,7 @@ int output1_fixed(fixed s, fixsize word1, FILE *file, unsigned radix)
 	return 0;
 }
 
-int output2_fixed(fixed s, fixsize word1, FILE *file, unsigned radix)
+int print2_fixed(fixed s, fixsize word1, FILE *file, unsigned radix)
 {
 	fixprint print;
 
@@ -2693,6 +2709,78 @@ int output2_fixed(fixed s, fixsize word1, FILE *file, unsigned radix)
 	free_fixprint(print);
 
 	return 0;
+}
+
+int println1_fixed(fixed s, fixsize word1, FILE *file, unsigned radix)
+{
+	int check;
+
+	check = print1_fixed(s, word1, file, radix);
+	if (check)
+		return check;
+	fprintf(file, "\n");
+	return 0;
+}
+
+int println2_fixed(fixed s, fixsize word1, FILE *file, unsigned radix)
+{
+	int check;
+
+	check = print2_fixed(s, word1, file, radix);
+	if (check)
+		return check;
+	fprintf(file, "\n");
+	return 0;
+}
+
+
+/***********************************************************************
+ * binary I/O
+ ***********************************************************************/
+void input_fixptr(fixptr r, fixsize word, const void *p, size_t size, int little)
+{
+	uint8_t u;
+	const uint8_t *input;
+	fixnum value;
+	size_t i, k, x, y, byte;
+
+	input = (const uint8_t *)p;
+	byte = FIXED_FULLBIT / 8;
+	i = 0;
+	for (x = 0; x < word; x++) {
+		value = 0;
+		if (i < size) {
+			for (y = 0; y < byte; y++) {
+				k = little? i: (size - i - 1);
+				u = (i < size)? input[k]: 0;
+				i++;
+				value |= ((fixnum)u) << (y * 8);
+			}
+		}
+		r[x] = value;
+	}
+}
+
+void output_fixptr(fixptr x, fixsize word, void *p, size_t size, int little)
+{
+	uint8_t u, *output;
+	size_t i, k, byte, allsize, m, n;
+
+	output = (uint8_t *)p;
+	byte = FIXED_FULLBIT / 8;
+	allsize = word * byte;
+	for (i = 0; i < size; i++) {
+		if (i < allsize) {
+			n = i / byte;
+			m = i % byte;
+			u = 0xFFU & (x[n] >> (m * 8));
+		}
+		else {
+			u = 0;
+		}
+		k = little? i: (size - i - 1);
+		output[k] = u;
+	}
 }
 
 

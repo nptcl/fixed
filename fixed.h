@@ -172,7 +172,10 @@ int compare_fixnum_fixptr(fixptr x, fixsize word, fixnum y);
 int compare_fixptr(fixptr x, fixsize size1, fixptr y, fixsize size2);
 void addv_fixptr(fixptr p, fixsize size, fixnum v, fixnum *carry);
 void subv_fixptr(fixptr p, fixsize size, fixnum v, fixnum *carry);
+void mulv_fixptr(fixptr p, fixsize size, fixnum v, fixnum *carry);
 void add_fixptr(fixptr a, fixptr b, fixptr r, fixsize size, fixnum *carry);
+void sub2_fixptr(fixptr a, fixsize size1, fixptr b, fixsize size2,
+		fixptr r, fixsize size3, fixnum *carry);
 void sub_fixptr(fixptr a, fixptr b, fixptr r, fixsize size, fixnum *carry);
 void shiftl_fixptr(fixptr x, fixsize size, fixsize shift);
 void shiftr_fixptr(fixptr x, fixsize size, fixsize shift);
@@ -291,8 +294,14 @@ fixprint make1_fixprint(fixed s, fixsize word1, unsigned radix);
 fixprint make2_fixprint(fixed s, fixsize word1, unsigned radix);
 void string_fixprint(fixprint print, char *str, size_t size);
 void file_fixprint(fixprint print, FILE *file);
-int output1_fixed(fixed s, fixsize word1, FILE *file, unsigned radix);
-int output2_fixed(fixed s, fixsize word1, FILE *file, unsigned radix);
+int print1_fixed(fixed s, fixsize word1, FILE *file, unsigned radix);
+int print2_fixed(fixed s, fixsize word1, FILE *file, unsigned radix);
+int println1_fixed(fixed s, fixsize word1, FILE *file, unsigned radix);
+int println2_fixed(fixed s, fixsize word1, FILE *file, unsigned radix);
+
+/* binary I/O */
+void input_fixptr(fixptr r, fixsize word, const void *p, size_t size, int little);
+void output_fixptr(fixptr x, fixsize word, void *p, size_t size, int little);
 
 /* random */
 void random_equal_fixptr(fixed s, fixptr x, fixptr r, fixsize size);
