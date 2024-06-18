@@ -54,7 +54,7 @@ static void byte1_sha32encode(struct sha32encode *ptr, uint8_t v,
 		i = 0;
 	}
 	ptr->i = i;
-	ptr->s += 8;
+	ptr->s++;
 }
 
 static void byte2_sha32encode(struct sha32encode *ptr, uint8_t v,
@@ -76,7 +76,7 @@ static void byte2_sha32encode(struct sha32encode *ptr, uint8_t v,
 		i = 0;
 	}
 	ptr->i = i;
-	ptr->s += 8;
+	ptr->s++;
 }
 
 static void read_sha32encode(struct sha32encode *ptr, const void *pvoid, size_t size,
@@ -98,7 +98,7 @@ static void finish_sha32encode(struct sha32encode *ptr, int is_sha,
 	uint32_t s1, s2;
 	uint64_t s;
 
-	s = (uint64_t)ptr->s;
+	s = 8ULL * (uint64_t)ptr->s;
 	s1 = (uint32_t)(s >> 32);
 	s2 = (uint32_t)(s & 0xFFFFFFFFUL);
 
@@ -277,6 +277,7 @@ static void next_md5encode(struct sha32encode *ptr)
 	Md5Encode_Calc(I,w, c,d,a,b,  2, 15, 63);
 	Md5Encode_Calc(I,w, b,c,d,a,  9, 21, 64);
 
+	/* add */
 	ptr->h[0] += a;
 	ptr->h[1] += b;
 	ptr->h[2] += c;
@@ -375,6 +376,7 @@ static void next_sha1encode(struct sha32encode *ptr)
 		t = sha32_rotl(a, 5) + sha_ch(b, c, d) + e + SHA1_K0 + w[i];
 		sha1_abcde(a, b, c, d, e, t);
 	}
+
 	/* 16 - 19 */
 	for (i = 16; i < 20; i++) {
 		s = i & 0x0F;
@@ -382,6 +384,7 @@ static void next_sha1encode(struct sha32encode *ptr)
 		t = sha32_rotl(a, 5) + sha_ch(b, c, d) + e + SHA1_K0 + w[s];
 		sha1_abcde(a, b, c, d, e, t);
 	}
+
 	/* 20 - 39 */
 	for (i = 20; i < 40; i++) {
 		s = i & 0x0F;
@@ -389,6 +392,7 @@ static void next_sha1encode(struct sha32encode *ptr)
 		t = sha32_rotl(a, 5) + sha_parity(b, c, d) + e + SHA1_K1 + w[s];
 		sha1_abcde(a, b, c, d, e, t);
 	}
+
 	/* 40 - 59 */
 	for (i = 40; i < 60; i++) {
 		s = i & 0x0F;
@@ -396,6 +400,7 @@ static void next_sha1encode(struct sha32encode *ptr)
 		t = sha32_rotl(a, 5) + sha_maj(b, c, d) + e + SHA1_K2 + w[s];
 		sha1_abcde(a, b, c, d, e, t);
 	}
+
 	/* 60 - 79 */
 	for (i = 60; i < 80; i++) {
 		s = i & 0x0F;
@@ -689,7 +694,7 @@ static void byte_sha64encode(void (*next)(struct sha64encode *),
 		i = 0;
 	}
 	ptr->i = i;
-	ptr->s += 8;
+	ptr->s++;
 }
 
 static void read_sha64encode(void (*byte)(struct sha64encode *, uint8_t),
@@ -710,7 +715,7 @@ static void finish_sha64encode(void (*next)(struct sha64encode *),
 	uint64_t s1, s2;
 	size_t s;
 
-	s = ptr->s;
+	s = 8ULL * (uint64_t)ptr->s;
 #if UINT64_MAX < SIZE_MAX
 	s1 = (uint64_t)(s >> 64ULL);
 	s2 = (uint64_t)(s & 0xFFFFFFFFFFFFFFFFULL);
@@ -918,11 +923,13 @@ static inline uint64_t sha3_swap_load64(const uint8_t *a)
 	uint64_t v;
 
 	v = a[sizeof(uint64_t) - 1];
-	for (i = sizeof(uint64_t) - 2; ; i--) {
+	i = sizeof(uint64_t) - 2;
+	for (;;) {
 		v <<= 8ULL;
 		v |= a[i];
 		if (i == 0)
 			break;
+		i--;
 	}
 
 	return v;
@@ -932,9 +939,10 @@ static inline void sha3_swap_store64(uint8_t *a, uint64_t v)
 {
 	int i;
 
-	for (i = 0; i < sizeof(uint64_t); i++) {
-		a[i] = (uint8_t)(v & 0xFFU);
-		v >>= 8ULL;
+	for (i = 0; ; v >>= 8ULL) {
+		a[i++] = (uint8_t)(v & 0xFFU);
+		if (sizeof(uint64_t) <= i)
+			break;
 	}
 }
 
@@ -942,9 +950,10 @@ static inline void sha3_swap_xor64(uint8_t *a, uint64_t v)
 {
 	int i;
 
-	for (i = 0; i < sizeof(uint64_t); i++) {
-		a[i] ^= (uint8_t)(v & 0xFFU);
-		v >>= 8ULL;
+	for (i = 0; ; v >>= 8ULL) {
+		a[i++] ^= (uint8_t)(v & 0xFFU);
+		if (sizeof(uint64_t) <= i)
+			break;
 	}
 }
 #endif

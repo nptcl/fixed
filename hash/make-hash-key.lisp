@@ -1,5 +1,3 @@
-#!/usr/bin/env -S sbcl --script
-
 (defun make-hashkey (n)
   (dotimes (i n)
     (write-char

@@ -15,6 +15,12 @@
 #define FIXED_DEBUG
 #endif
 
+#ifdef FIXED_DEBUG
+#ifndef FIXED_SIZE_CHECK
+#define FIXED_SIZE_CHECK
+#endif
+#endif
+
 #if defined(FIXED_LINUX) || defined(FIXED_FREEBSD) || defined(FIXED_UNIX)
 #undef FIXED_LINUX
 #undef FIXED_FREEBSD
@@ -62,6 +68,9 @@
 #define FIXED_HALFBIT			4
 #define FIXED_PRINT_LENGTH		"2"
 #define FIXED_PRINT				"u"
+#undef FIXED_16BIT
+#undef FIXED_32BIT
+#undef FIXED_64BIT
 typedef uint8_t fixnum;
 #elif defined(FIXED_16BIT)
 /* 16 bit */
@@ -72,6 +81,9 @@ typedef uint8_t fixnum;
 #define FIXED_HALFBIT			8
 #define FIXED_PRINT_LENGTH		"4"
 #define FIXED_PRINT				"u"
+#undef FIXED_8BIT
+#undef FIXED_32BIT
+#undef FIXED_64BIT
 typedef uint16_t fixnum;
 #elif defined(FIXED_32BIT)
 /* 32 bit */
@@ -82,6 +94,9 @@ typedef uint16_t fixnum;
 #define FIXED_HALFBIT			16
 #define FIXED_PRINT_LENGTH		"8"
 #define FIXED_PRINT				"ul"
+#undef FIXED_8BIT
+#undef FIXED_16BIT
+#undef FIXED_64BIT
 typedef uint32_t fixnum;
 #else
 /* 64 bit */
@@ -92,6 +107,12 @@ typedef uint32_t fixnum;
 #define FIXED_HALFBIT			32
 #define FIXED_PRINT_LENGTH		"16"
 #define FIXED_PRINT				PRIX64
+#undef FIXED_8BIT
+#undef FIXED_16BIT
+#undef FIXED_32BIT
+#ifndef FIXED_64BIT
+#define FIXED_64BIT
+#endif
 typedef uint64_t fixnum;
 #endif
 

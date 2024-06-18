@@ -76,9 +76,9 @@ void string_sha512encode(const char *, void *);
 /*
  *  SHA-3
  */
-/* #define SHA3_LITTLE_ENDIAN */
-/* #define SHA3_BIG_ENDIAN */
-/* #define SHA3_IGNORE_ENDIAN_CHECK */
+/*  #define SHA3_LITTLE_ENDIAN        */
+/*  #define SHA3_BIG_ENDIAN           */
+/*  #define SHA3_IGNORE_ENDIAN_CHECK  */
 
 enum tail_sha3encode {
 	sha3encode_01,

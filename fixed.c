@@ -804,7 +804,7 @@ static void rotatel1_byte_fixptr(fixptr r, fixsize w, fixsize n)
 		/* left */
 		for (i = 0; i < n; i++) {
 			a = r[w1];
-			memcpy_fixptr(r + 1, r, w1);
+			memmove_fixptr(r + 1, r, w1);
 			r[0] = a;
 		}
 	}
@@ -1098,11 +1098,26 @@ int getu_fixptr(fixptr x, fixsize size, unsigned *r)
 /*
  *  function
  */
+#ifdef FIXED_SIZE_CHECK
+#define fixed_size_abort(s, size) { \
+	if (s->size < (s->index + size)) { \
+		fprintf(stderr, "push error: stack size is too small.\n"); \
+		exit(1); \
+	} \
+}
+#else
+#define fixed_size_abort(s, size)
+#endif
+
 #ifdef FIXED_DEBUG
 /* debug */
 static fixptr check_fixdebug(fixptr x)
 {
+#ifdef FIXED_64BIT
+	uint64_t a, b, r;
+#else
 	uint32_t a, b, r;
+#endif
 	fixptr y;
 
 #if defined(FIXED_8BIT)
@@ -1116,9 +1131,9 @@ static fixptr check_fixdebug(fixptr x)
 	b = *(uint32_t *)(x + 2 + 2 + r);
 	y = x + 2 + 2;
 #else
-	a = (uint32_t)x[0];
-	r = (uint32_t)x[1];
-	b = (uint32_t)x[1 + 1 + r];
+	a = x[0];
+	r = x[1];
+	b = x[1 + 1 + r];
 	y = x + 1 + 1;
 #endif
 	if (a != b) {
@@ -1153,13 +1168,14 @@ fixptr get1_fixed(fixed s, fixsize word1)
 
 static void push0_fixed(fixed s, fixsize word, fixsize size)
 {
-	fixptr x;
+#ifdef FIXED_64BIT
+	uint64_t *a, *b, *r;
+#else
 	uint32_t *a, *b, *r;
+#endif
+	fixptr x;
 
-	if (s->size < (s->index + size)) {
-		fprintf(stderr, "push error: stack size is too small.\n");
-		exit(1);
-	}
+	fixed_size_abort(s, size);
 	x = s->stack + s->index;
 #if defined(FIXED_8BIT)
 	a = (uint32_t *)x;
@@ -1170,12 +1186,17 @@ static void push0_fixed(fixed s, fixsize word, fixsize size)
 	r = (uint32_t *)(x + 2);
 	b = (uint32_t *)(x + 2 + 2 + word);
 #else
-	a = (uint32_t *)x;
-	r = (uint32_t *)(x + 1);
-	b = (uint32_t *)(x + 1 + 1 + word);
+	a = x;
+	r = x + 1;
+	b = x + 1 + 1 + word;
 #endif
+#ifdef FIXED_64BIT
+	*a = *b = (uint64_t)number64_fixrandom(&s->state);
+	*r = (uint64_t)word;
+#else
 	*a = *b = (uint32_t)number64_fixrandom(&s->state);
 	*r = (uint32_t)word;
+#endif
 	push_fixrelease(s, size);
 	if (s->index_max < s->index)
 		s->index_max = s->index;
@@ -1220,11 +1241,13 @@ fixptr get1_fixed(fixed s, fixsize word1)
 
 void push1_fixed(fixed s)
 {
+	fixed_size_abort(s, s->word1);
 	push_fixrelease(s, s->word1);
 }
 
 void push2_fixed(fixed s)
 {
+	fixed_size_abort(s, s->word2);
 	push_fixrelease(s, s->word2);
 }
 

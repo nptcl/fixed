@@ -51,7 +51,7 @@ done > hash.sha3-512
 # shake-256-256
 echo "shake-256-256"
 for i in `cat key`; do
-  hash=`echo -n "$i" | openssl dgst -shake-256 -xoflen=32| awk '{print $2}'`
+  hash=`echo -n "$i" | openssl dgst -shake-256 -xoflen=32 | awk '{print $2}'`
   echo "$i $hash"
 done > hash.shake-256-256
 
@@ -59,7 +59,7 @@ done > hash.shake-256-256
 # shake-256-800
 echo "shake-256-800"
 for i in `cat key`; do
-  hash=`echo -n "$i" | openssl dgst -shake-256 -xoflen=100| awk '{print $2}'`
+  hash=`echo -n "$i" | openssl dgst -shake-256 -xoflen=100 | awk '{print $2}'`
   echo "$i $hash"
 done > hash.shake-256-800
 
