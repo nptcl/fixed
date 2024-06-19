@@ -1,5 +1,5 @@
 /*
- *  SHA-1, SHA-2, SHA-3
+ *  MD5, SHA-1, SHA-2, SHA-3
  */
 #ifndef __SHA_HEADER__
 #define __SHA_HEADER__
@@ -76,10 +76,6 @@ void string_sha512encode(const char *, void *);
 /*
  *  SHA-3
  */
-/*  #define SHA3_LITTLE_ENDIAN        */
-/*  #define SHA3_BIG_ENDIAN           */
-/*  #define SHA3_IGNORE_ENDIAN_CHECK  */
-
 enum tail_sha3encode {
 	sha3encode_01,
 	sha3encode_11,
@@ -88,7 +84,7 @@ enum tail_sha3encode {
 
 struct sha3encode {
 	enum tail_sha3encode tail;
-	unsigned c, dbyte, r, i, rbyte;
+	unsigned i, dbyte, rbyte, sha3_c, sha3_r;
 	uint64_t a[25];
 };
 

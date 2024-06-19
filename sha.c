@@ -895,27 +895,8 @@ void string_sha512encode(const char *from, void *result)
 /*
  *  SHA-3: keccak
  */
-#if defined(SHA3_LITTLE_ENDIAN)
-#undef SHA3_BIG_ENDIAN
-#elif defined(SHA3_BIG_ENDIAN)
-#undef SHA3_LITTLE_ENDIAN
-#else
-/* default -> LITTLE_ENDIAN */
-#define SHA3_LITTLE_ENDIAN
-#undef SHA3_BIG_ENDIAN
-#endif
 
 #define sha3_xy(x, y)			(5*(y) + (x))
-
-#ifdef SHA3_LITTLE_ENDIAN
-#define sha3_load64(a,n)		((a)[n])
-#define sha3_store64(a,n,v)		((a)[n] = (v))
-#define sha3_xor64(a,n,v)		((a)[n] ^= (v))
-#else
-#define sha3_cast8(a,n)			((uint8_t *)((a) + (n)))
-#define sha3_load64(a,n)		sha3_swap_load64(sha3_cast8((a), (n)))
-#define sha3_store64(a,n,v)		sha3_swap_store64(sha3_cast8((a), (n)), (v))
-#define sha3_xor64(a,n,v)		sha3_swap_xor64(sha3_cast8((a), (n)), (v))
 
 static inline uint64_t sha3_swap_load64(const uint8_t *a)
 {
@@ -956,7 +937,6 @@ static inline void sha3_swap_xor64(uint8_t *a, uint64_t v)
 			break;
 	}
 }
-#endif
 
 static const unsigned rho_sha3encode[25] = {
 	0,  1,  62, 28, 27,
@@ -981,57 +961,85 @@ static const uint64_t rc_sha3encode[24] = {
 	0x0000000080000001ULL, 0x8000000080008008ULL
 };
 
-static void round_sha3encode(struct sha3encode *ptr, int i)
-{
-	unsigned x, y, xy, x1, x2, p, q;
-	uint64_t *a, b[25], c[5];
-	uint64_t v, v1, v2, v3;
-
-	/* theta */
-	a = ptr->a;
-	for (x = 0; x < 5; x++) {
-		c[x] = sha3_load64(a, sha3_xy(x, 0)) ^
-			sha3_load64(a, sha3_xy(x, 1)) ^
-			sha3_load64(a, sha3_xy(x, 2)) ^
-			sha3_load64(a, sha3_xy(x, 3)) ^
-			sha3_load64(a, sha3_xy(x, 4));
-	}
-	for (x = 0; x < 5; x++) {
-		x1 = x? (x - 1): 4;
-		x2 = (x + 1) % 5;
-		v = c[x1] ^ sha64_rotl(c[x2], 1);
-		for (y = 0; y < 5; y++)
-			sha3_xor64(a, sha3_xy(x, y), v);
-	}
-
-	/* rho, pi */
-	for (x = 0; x < 5; x++) {
-		for (y = 0; y < 5; y++) {
-			xy = (2 * x + 3 * y) % 5;
-			p = sha3_xy(x, y);
-			q = sha3_xy(y, xy);
-			v = sha3_load64(a, p);
-			v = sha64_rotl(v, rho_sha3encode[p]);
-			sha3_store64(b, q, v);
-		}
-	}
-
-	/* chi */
-	for (y = 0; y < 5; y++) {
-		for (x = 0; x < 5; x++)
-			c[x] = sha3_load64(b, sha3_xy(x, y));
-		for (x = 0; x < 5; x++) {
-			v1 = c[x];
-			v2 = c[(x + 1) % 5];
-			v3 = c[(x + 2) % 5];
-			v = v1 ^ ((~v2) & v3);
-			sha3_store64(a, sha3_xy(x, y), v);
-		}
-	}
-
-	/* iota */
-	sha3_xor64(a, sha3_xy(0, 0), rc_sha3encode[i]);
+#define round_macro_sha3encode(ptr, i) \
+{ \
+	unsigned x, y, xy, x1, x2, p, q; \
+	uint64_t *a, b[25], c[5]; \
+	uint64_t v, v1, v2, v3; \
+	\
+	/* theta */ \
+	a = ptr->a; \
+	for (x = 0; x < 5; x++) { \
+		c[x] = sha3_load64(a, sha3_xy(x, 0)) ^ \
+		sha3_load64(a, sha3_xy(x, 1)) ^ \
+		sha3_load64(a, sha3_xy(x, 2)) ^ \
+		sha3_load64(a, sha3_xy(x, 3)) ^ \
+		sha3_load64(a, sha3_xy(x, 4)); \
+	} \
+	for (x = 0; x < 5; x++) { \
+		x1 = x? (x - 1): 4; \
+		x2 = (x + 1) % 5; \
+		v = c[x1] ^ sha64_rotl(c[x2], 1); \
+		for (y = 0; y < 5; y++) \
+		sha3_xor64(a, sha3_xy(x, y), v); \
+	} \
+	\
+	/* rho, pi */ \
+	for (x = 0; x < 5; x++) { \
+		for (y = 0; y < 5; y++) { \
+			xy = (2 * x + 3 * y) % 5; \
+			p = sha3_xy(x, y); \
+			q = sha3_xy(y, xy); \
+			v = sha3_load64(a, p); \
+			v = sha64_rotl(v, rho_sha3encode[p]); \
+			sha3_store64(b, q, v); \
+		} \
+	} \
+	\
+	/* chi */ \
+	for (y = 0; y < 5; y++) { \
+		for (x = 0; x < 5; x++) \
+		c[x] = sha3_load64(b, sha3_xy(x, y)); \
+		for (x = 0; x < 5; x++) { \
+			v1 = c[x]; \
+			v2 = c[(x + 1) % 5]; \
+			v3 = c[(x + 2) % 5]; \
+			v = v1 ^ ((~v2) & v3); \
+			sha3_store64(a, sha3_xy(x, y), v); \
+		} \
+	} \
+	\
+	/* iota */ \
+	sha3_xor64(a, sha3_xy(0, 0), rc_sha3encode[i]); \
 }
+
+#define sha3_load64(a,n)		((a)[n])
+#define sha3_store64(a,n,v)		((a)[n] = (v))
+#define sha3_xor64(a,n,v)		((a)[n] ^= (v))
+static void round1_sha3encode(struct sha3encode *ptr, int i)
+{
+	round_macro_sha3encode(ptr, i);
+}
+
+#undef sha3_cast8
+#undef sha3_load64
+#undef sha3_store64
+#undef sha3_xor64
+#define sha3_cast8(a,n)			((uint8_t *)((a) + (n)))
+#define sha3_load64(a,n)		sha3_swap_load64(sha3_cast8((a), (n)))
+#define sha3_store64(a,n,v)		sha3_swap_store64(sha3_cast8((a), (n)), (v))
+#define sha3_xor64(a,n,v)		sha3_swap_xor64(sha3_cast8((a), (n)), (v))
+static void round2_sha3encode(struct sha3encode *ptr, int i)
+{
+	round_macro_sha3encode(ptr, i);
+}
+
+#undef sha3_cast8
+#undef sha3_load64
+#undef sha3_store64
+#undef sha3_xor64
+
+static void (*round_sha3encode)(struct sha3encode *ptr, int i) = NULL;
 
 static void keccak_sha3encode(struct sha3encode *ptr)
 {
@@ -1137,44 +1145,35 @@ void calc_sha3encode(struct sha3encode *ptr, void *pvoid)
 /*
  *  SHA-3: init
  */
-#ifndef SHA3_IGNORE_ENDIAN_CHECK
-#include <stdio.h>
-#include <stdlib.h>
-
-static void endian_check_sha3encode(void)
+static int little_endian_sha3encode(void)
 {
-	union sha3_endian_check {
-		unsigned char x[sizeof(int)];
+	union little_endian_union_sha3encode {
 		int y;
+		char x[sizeof(int)];
 	} u;
 
 	u.y = 1;
-#ifdef SHA3_LITTLE_ENDIAN
-	if (u.x[0] == 0) {
-		fprintf(stderr, "endian error, Add #define SHA3_BIG_ENDIAN.\n");
-		exit(1);
-	}
-#else
-	if (u.x[0] != 0) {
-		fprintf(stderr, "endian error, Add #define SHA3_LITTLE_ENDIAN.\n");
-		exit(1);
-	}
-#endif
+	return (int)u.x[0];
 }
-#endif
 
 static void init_sha3encode(struct sha3encode *ptr,
 		unsigned cbit, unsigned dbit, enum tail_sha3encode tail)
 {
-#ifndef SHA3_IGNORE_ENDIAN_CHECK
-	endian_check_sha3encode();
-#endif
+	/* round */
+	if (round_sha3encode == NULL) {
+		round_sha3encode =
+			little_endian_sha3encode()?
+			round1_sha3encode:
+			round2_sha3encode;
+	}
+
+	/* instance */
 	memset(ptr->a, 0, sizeof(uint64_t) * 25);
 	ptr->i = 0;
-	ptr->c = cbit;  /* capacity bit */
+	ptr->sha3_c = cbit;  /* capacity bit */
+	ptr->sha3_r = 1600 - ptr->sha3_c;  /* rate bit */
 	ptr->dbyte = dbit / 8;  /* output byte */
-	ptr->r = 1600 - ptr->c;  /* rate bit */
-	ptr->rbyte = ptr->r / 8;  /* rate byte */;
+	ptr->rbyte = ptr->sha3_r / 8;  /* rate byte */;
 	ptr->tail = tail;
 }
 

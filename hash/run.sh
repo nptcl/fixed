@@ -12,11 +12,8 @@ checkerr()
   fi
 }
 
-compile_define="-DSHA3_LITTLE_ENDIAN"
-#compile_define="-DSHA3_BIG_ENDIAN"
-
 rm -f a.out *.o
-${compile} ${compile_define} ${source}
+${compile} ${source}
 checkerr "compile"
 ./${aout}
 checkerr "a.out error"
