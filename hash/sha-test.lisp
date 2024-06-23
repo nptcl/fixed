@@ -41,6 +41,30 @@
 
 
 ;;
+;;  sha512encode
+;;
+(defun sha512encode-equal (sha x y)
+  (dotimes (i (length x))
+    (byte-sha512encode sha (char-code (char x i))))
+  (let* ((a (calc-sha512encode sha))
+         (b (sha-string a)))
+    (unless (equalp b y)
+      (format t "ERROR: ~A, ~A, ~A~%" x y b)))
+  (init-sha512encode sha))
+
+(defun main-sha512encode ()
+  (let ((sha (make-sha512encode))
+        (file #p"hash.sha512"))
+    (format t "Test: ~A~%" file)
+    (with-open-file (input file)
+      (dolist (str (read-lines input))
+        (let* ((p (position #\Space str))
+               (x (subseq str 0 p))
+               (y (subseq str (1+ p))))
+          (sha512encode-equal sha x y))))))
+
+
+;;
 ;;  sha3encode
 ;;
 (defun sha3encode-equal (sha size x y)
@@ -78,5 +102,6 @@
 ;;  test
 ;;
 (main-sha256encode)
+(main-sha512encode)
 (main-sha3encode)
 

@@ -736,7 +736,7 @@ static void finish_sha64encode(void (*next)(struct sha64encode *),
 	(*next)(ptr);
 }
 
-void calc_sha64encode(void (*next)(struct sha64encode *),
+static void calc_sha64encode(void (*next)(struct sha64encode *),
 		struct sha64encode *ptr, void *pvoid, int size)
 {
 	int x, y, z, k;
