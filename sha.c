@@ -895,7 +895,6 @@ void string_sha512encode(const char *from, void *result)
 /*
  *  SHA-3: keccak
  */
-
 #define sha3_xy(x, y)			(5*(y) + (x))
 
 static inline uint64_t sha3_swap_load64(const uint8_t *a)
