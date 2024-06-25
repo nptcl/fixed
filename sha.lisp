@@ -9,6 +9,7 @@
     #:make-sha256encode
     #:init-sha256encode
     #:byte-sha256encode
+    #:read-sha256encode
     #:little-endian-sha256encode
     #:big-endian-sha256encode
     #:calc-sha256encode
@@ -17,6 +18,7 @@
     #:make-sha512encode
     #:init-sha512encode
     #:byte-sha512encode
+    #:read-sha512encode
     #:little-endian-sha512encode
     #:big-endian-sha512encode
     #:calc-sha512encode
@@ -30,6 +32,7 @@
     #:make-shake-256-encode
     #:init-sha3encode
     #:byte-sha3encode
+    #:read-sha3encode
     #:little-endian-sha3encode
     #:big-endian-sha3encode
     #:result-sha3encode
@@ -233,6 +236,9 @@
       (setq i 0))
     (setf (sha32encode-index sha) i)
     (incf (sha32encode-size sha) 1)))
+
+(defun read-sha256encode (sha v)
+  (map nil (lambda (x) (byte-sha256encode sha x)) v))
 
 (defun little-endian-sha256encode (sha x size)
   (dotimes (i size)
@@ -451,6 +457,9 @@
     (setf (sha64encode-index sha) i)
     (incf (sha64encode-size sha) 1)))
 
+(defun read-sha512encode (sha v)
+  (map nil (lambda (x) (byte-sha512encode sha x)) v))
+
 (defun little-endian-sha512encode (sha x size)
   (dotimes (i size)
     (byte-sha512encode sha (ldb (byte 8 (* i 8)) x))))
@@ -587,6 +596,9 @@
       (setf (sha3encode-index sha) i)
       (next-sha3encode sha)))
   (values))
+
+(defun read-sha3encode (sha v)
+  (map nil (lambda (x) (byte-sha3encode sha x)) v))
 
 (defun little-endian-sha3encode (sha x size)
   (dotimes (i size)
