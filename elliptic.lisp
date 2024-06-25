@@ -1,4 +1,56 @@
-(defpackage elliptic (:use common-lisp sha))
+(defpackage elliptic
+  (:use common-lisp sha)
+  (:export
+    #:*elliptic-bit*
+    #:*elliptic-p*
+    #:*elliptic-a*
+    #:*elliptic-b*
+    #:*elliptic-d*
+    #:*elliptic-g*
+    #:*elliptic-n*
+    #:*elliptic-h*
+    #:*elliptic-o*
+
+    #:point2
+    #:make-point2
+    #:point2-x
+    #:point2-y
+
+    #:point3
+    #:make-point3
+    #:point3-x
+    #:point3-y
+    #:point3-z
+
+    #:point4
+    #:make-point4
+    #:point4-x
+    #:point4-y
+    #:point4-z
+    #:point4-xy
+
+    #:power-mod
+    #:inverse
+    #:inverse-n
+    #:affine
+    #:equal-point
+    #:valid
+
+    #:addition
+    #:doubling
+    #:multiple
+    #:encode
+    #:decode
+    #:make-private
+    #:make-public
+    #:sign
+    #:verify
+
+    #:with-elliptic-secp256k1
+    #:with-elliptic-secp256r1
+    #:with-elliptic-ed25519
+    #:with-elliptic-ed448
+    ))
 (in-package elliptic)
 
 ;;
