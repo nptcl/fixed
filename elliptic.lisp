@@ -92,9 +92,9 @@
   '(448
     #xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
     #x01
-    #xD78B4BDC7F0DAF19F24F38C29373A2CCAD46157242A50F37809B1DA3412A12E79CCC9C81264CFE9AD080997058FB61C4243CC32DBAA156B9
-    (#x79A70B2B70400553AE7C9DF416C792C61128751AC92969240C25A07D728BDC93E21F7787ED6972249DE732F38496CD11698713093E9C04FC
-     #x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF80000000000000000000000000000000000000000000000000000001)
+    #xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF6756
+    (#x4F1970C66BED0DED221D15A622BF36DA9E146570470F1767EA6DE324A3D3A46412AE1AF72AB66511433B80E18B00938E2626A82BC70CC05E
+     #x693F46716EB6BC248876203756C9C7624BEA73736CA3984087789C1E05A0C2D73AD3FF1CE67C39C4FDBD132C4ED7C8AD9808795BF230FA14)
     #x3FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF7CCA23E9C44EDB49AED63690216CC2728DC58F552378C292AB5844F3
     #x04))
 
@@ -598,11 +598,11 @@
 ;;  private key
 ;;
 (defun make-private-256bit (&optional (n 4))
-  (let ((hash (make-sha256encode)))
+  (let ((sha (make-sha256encode)))
     (dotimes (i n)
-      (little-endian-sha256encode hash (random (ash 1 256)) 32))
+      (little-endian-sha256encode sha (random (ash 1 256)) 32))
     (vector-little-integer
-      (calc-sha256encode hash))))
+      (calc-sha256encode sha))))
 
 (defun make-private-secp256k1 ()
   (let ((x (modp (make-private-256bit))))
@@ -617,11 +617,11 @@
   (make-private-256bit))
 
 (defun make-private-ed448 (&optional (n 4))
-  (let ((hash (make-sha512encode)))
+  (let ((sha (make-sha512encode)))
     (dotimes (i n)
-      (little-endian-sha512encode hash (random (ash 1 512)) 64))
+      (little-endian-sha512encode sha (random (ash 1 512)) 64))
     (vector-little-integer
-      (calc-sha512encode hash) :end 57)))
+      (calc-sha512encode sha) :end 57)))
 
 (defun make-private ()
   (funcall *elliptic-make-private*))
@@ -637,13 +637,13 @@
   (multiple private *elliptic-g*))
 
 (defun make-public-sign-ed25519 (private)
-  (let ((hash (make-sha512encode)))
-    (little-endian-sha512encode hash private 32)
-    (let* ((v (calc-sha512encode hash))
+  (let ((sha (make-sha512encode)))
+    (little-endian-sha512encode sha private 32)
+    (let* ((v (calc-sha512encode sha))
            (a (vector-little-integer v :start 0 :end 32))
            (b (vector-little-integer v :start 32 :end 64)))
       (let ((v (ash 1 254)))
-        (setq a (logand a (- v 8)))
+        (setq a (logand a (- v 8)))  ;; cofactor
         (setq a (logior a v)))
       (values a b))))
 
@@ -653,13 +653,13 @@
     *elliptic-g*))
 
 (defun make-public-sign-ed448 (private)
-  (let ((hash (make-shake-256-encode)))
-    (little-endian-sha3encode hash private 57)
-    (let* ((v (result-sha3encode hash 114))
+  (let ((sha (make-shake-256-encode)))
+    (little-endian-sha3encode sha private 57)
+    (let* ((v (result-sha3encode sha 114))
            (a (vector-little-integer v :start 0 :end 57))
            (b (vector-little-integer v :start 57 :end 114)))
       (let ((v (ash 1 447)))
-        (setq a (logand a (- v 4)))
+        (setq a (logand a (- v 4)))  ;; cofactor
         (setq a (logior a v)))
       (values a b))))
 
@@ -723,8 +723,12 @@
       (values re s))))
 
 ;;  ed448
-(defun sign-sha-ed448 (x y message)
+(defun sign-sha-ed448 (x y message &optional (sha1 0) (sha2 #()))
   (let ((sha (make-shake-256-encode)))
+    (read-sha3encode sha (map 'vector #'char-code "SigEd448"))
+    (byte-sha3encode sha sha1)
+    (byte-sha3encode sha (length sha2))
+    (read-sha3encode sha sha2)
     (when x (little-endian-sha3encode sha x 57))
     (when y (little-endian-sha3encode sha y 57))
     (read-sha3encode sha message)
