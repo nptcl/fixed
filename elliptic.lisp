@@ -1,6 +1,7 @@
 (defpackage elliptic
   (:use common-lisp sha)
   (:export
+    #:*elliptic-curve*
     #:*elliptic-bit*
     #:*elliptic-p*
     #:*elliptic-a*
@@ -35,6 +36,7 @@
     #:affine
     #:equal-point
     #:valid
+    #:neutral
 
     #:addition
     #:doubling
@@ -96,6 +98,7 @@
     #x3FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF7CCA23E9C44EDB49AED63690216CC2728DC58F552378C292AB5844F3
     #x04))
 
+(defvar *elliptic-curve*)
 (defvar *elliptic-bit*)
 (defvar *elliptic-p*)
 (defvar *elliptic-a*)
@@ -106,6 +109,7 @@
 (defvar *elliptic-h*)
 (defvar *elliptic-o*)
 (defvar *elliptic-valid*)
+(defvar *elliptic-neutral*)
 (defvar *elliptic-addition*)
 (defvar *elliptic-doubling*)
 (defvar *elliptic-make-private*)
@@ -218,6 +222,26 @@
 
 (defun valid (v)
   (funcall *elliptic-valid* v))
+
+
+;;
+;;  neutral
+;;
+(defun neutral-weierstrass (v)
+  (cond ((typep v 'point4) nil)
+        ((typep v 'point3) (zerop (point3-z v)))
+        ((typep v 'point2) (and (= (point2-x v) 0)
+                                (= (point2-y v) 0)))))
+
+(defun neutral-edwards (v)
+  (when (or (typep v 'point4)
+            (typep v 'point3))
+    (setq v (affine v)))
+  (and (= (point2-x v) 0)
+       (= (point2-y v) 1)))
+
+(defun neutral (v)
+  (funcall *elliptic-neutral* v))
 
 
 ;;
@@ -402,6 +426,13 @@
           (incf k 1))
     r))
 
+(defun integer-big-vector (v size)
+  (let ((a (make-array size :element-type '(unsigned-byte 8))))
+    (dotimes (i size)
+      (let ((k (- size i 1)))
+        (setf (aref a i) (ldb (byte 8 (* k 8)) v))))
+    a))
+
 (defun vector-big-integer (v &key (start 0) end)
   (unless end
     (setq end (length v)))
@@ -433,25 +464,26 @@
 ;;
 ;;  encode
 ;;
-(defun encode-weierstrass (v compress)
+
+;;  secp256k1, secp256r1 -> vector
+(defun encode-secp256k1 (v &optional (compress t))
   (let ((x (point3-x v))
         (y (point3-y v))
         (z (point3-z v)))
-    (cond ((zerop z) #x00)
+    (cond ((zerop z)
+           (integer-big-vector #x00 1))
           ((null compress)
-           (logior (ash #x04 (* 256 2))
-                   (ash x 256)
-                   y))
-          (t (logior
-               (ash (if (logbitp 0 y) #x03 #x04) 256)
-               x)))))
-
-(defun encode-secp256k1 (v &optional (compress t))
-  (encode-weierstrass v compress))
+           (integer-big-vector
+             (logior (ash #x04 (* 256 2)) (ash x 256) y)
+             (1+ 64)))
+          (t (integer-big-vector
+               (logior (ash (if (logbitp 0 y) #x03 #x02) 256) x)
+               (1+ 32))))))
 
 (defun encode-secp256r1 (v &optional (compress t))
-  (encode-weierstrass v compress))
+  (encode-secp256k1 v compress))
 
+;;  ed25519 -> integer
 (defun encode-ed25519 (v)
   (let* ((a (affine v))
          (x (point2-x a))
@@ -460,6 +492,7 @@
       (setq y (logior y (ash 1 255))))
     y))
 
+;;  ed448 -> integer
 (defun encode-ed448 (v)
   (let* ((a (affine v))
          (x (point2-x a))
@@ -476,16 +509,34 @@
 ;;  decode
 ;;
 
-;;  ed25519
-(defun decode-weierstrass (r)
-  (error "TODO: ~A" r))
+;;  secp256k1, secp256r1 <- vector
+(defun decode-compress-secp256k1 (v y0)
+  (let* ((x (vector-big-integer v :start 1 :end 33))
+         (a (modp (+ (* x x x) (* *elliptic-a* x) *elliptic-b*)))
+         (y (square-root-mod-4 a)))
+    (when y
+      (unless (= (logand y #x01) y0)
+        (setq y (- *elliptic-p* y)))
+      (make-point3 x y))))
 
-(defun decode-secp256k1 (r)
-  (decode-weierstrass r))
+(defun decode-uncompress-secp256k1 (v)
+  (let ((p (make-point3
+             (vector-big-integer v :start 1 :end 33)
+             (vector-big-integer v :start 33 :end 65))))
+    (when (valid p)
+      p)))
 
-(defun decode-secp256r1 (r)
-  (decode-weierstrass r))
+(defun decode-secp256k1 (v)
+  (case (aref v 0)
+    (#x00 (make-point3 0 0 0))
+    (#x02 (decode-compress-secp256k1 v 0))
+    (#x03 (decode-compress-secp256k1 v 1))
+    (#x04 (decode-uncompress-secp256k1 v))))
 
+(defun decode-secp256r1 (v)
+  (decode-secp256k1 v))
+
+;;  ed25519 <- integer
 (defun decode-ed25519-x (y)
   (when (< y *elliptic-p*)
     (let* ((yy (* y y))
@@ -511,8 +562,7 @@
           ((/= (logand x #x01) x0) (make-point4 (- *elliptic-p* x) y))
           (t (make-point4 x y)))))
 
-
-;;  ed448
+;;  ed448 <- integer
 (defun decode-ed448-x (y)
   (when (< y *elliptic-p*)
     (let* ((yy (* y y))
@@ -530,6 +580,7 @@
       (when (= v1x2 u1)
         x))))
 
+;;  decode
 (defun decode-ed448 (r)
   (let* ((y (ldb (byte 455 0) r))
          (x0 (ldb (byte 1 455) r))
@@ -607,7 +658,7 @@
     (let* ((v (result-sha3encode hash 114))
            (a (vector-little-integer v :start 0 :end 57))
            (b (vector-little-integer v :start 57 :end 114)))
-      (let ((v (ash 1 (- 114 8 1))))
+      (let ((v (ash 1 447)))
         (setq a (logand a (- v 4)))
         (setq a (logior a v)))
       (values a b))))
@@ -626,42 +677,36 @@
 ;;
 
 ;;  secp256k1, secp256r1
-(defun sign-sha-weierstrass (message)
+(defun sign-sha-secp256k1 (message)
   (let ((sha (make-sha256encode)))
     (read-sha256encode sha message)
     (vector-big-integer
       (calc-sha256encode sha))))
 
-(defun sign-loop-weierstrass (private message)
+(defun sign-loop-secp256k1 (private message)
   (let* ((k (make-private))
          (a (affine (make-public k)))
          (r (modn (point2-x a))))
     (unless (zerop r)
-      (let* ((e (sign-sha-weierstrass message))
+      (let* ((e (sign-sha-secp256k1 message))
              (s (modn (* (inverse-n k) (+ e (* r private))))))
         (unless (zerop s)
           (values r s))))))
 
-(defun sign-weierstrass (private message)
-  (multiple-value-bind (r s) (sign-loop-weierstrass private message)
+(defun sign-secp256k1 (private message)
+  (multiple-value-bind (r s) (sign-loop-secp256k1 private message)
     (if r
       (values r s)
-      (sign-weierstrass private message))))
-
-(defun sign-secp256k1 (private message)
-  (sign-weierstrass private message))
+      (sign-secp256k1 private message))))
 
 (defun sign-secp256r1 (private message)
-  (sign-weierstrass private message))
-
+  (sign-secp256k1 private message))
 
 ;;  ed25519
-(defun sha512-message-ed25519 (x y message)
+(defun sign-sha-ed25519 (x y message)
   (let ((sha (make-sha512encode)))
-    (when x
-      (little-endian-sha512encode sha x 32))
-    (when y
-      (little-endian-sha512encode sha y 32))
+    (when x (little-endian-sha512encode sha x 32))
+    (when y (little-endian-sha512encode sha y 32))
     (read-sha512encode sha message)
     (modn (vector-little-integer
             (calc-sha512encode sha)))))
@@ -670,21 +715,18 @@
   (multiple-value-bind (a prefix) (make-public-sign-ed25519 private)
     (let* ((ag (multiple a *elliptic-g*))
            (ae (encode ag))
-           (rp (sha512-message-ed25519 prefix nil message))
+           (rp (sign-sha-ed25519 prefix nil message))
            (rg (multiple rp *elliptic-g*))
            (re (encode rg))
-           (h (sha512-message-ed25519 re ae message))
+           (h (sign-sha-ed25519 re ae message))
            (s (modn (+ rp (* h a)))))
       (values re s))))
 
-
 ;;  ed448
-(defun sha3-message-ed448 (x y message)
+(defun sign-sha-ed448 (x y message)
   (let ((sha (make-shake-256-encode)))
-    (when x
-      (little-endian-sha3encode sha x 57))
-    (when y
-      (little-endian-sha3encode sha y 57))
+    (when x (little-endian-sha3encode sha x 57))
+    (when y (little-endian-sha3encode sha y 57))
     (read-sha3encode sha message)
     (modn (vector-little-integer
             (result-sha3encode sha 114)))))
@@ -693,13 +735,14 @@
   (multiple-value-bind (a prefix) (make-public-sign-ed448 private)
     (let* ((ag (multiple a *elliptic-g*))
            (ae (encode ag))
-           (rp (sha3-message-ed448 prefix nil message))
+           (rp (sign-sha-ed448 prefix nil message))
            (rg (multiple rp *elliptic-g*))
            (re (encode rg))
-           (h (sha3-message-ed448 re ae message))
+           (h (sign-sha-ed448 re ae message))
            (s (modn (+ rp (* h a)))))
       (values re s))))
 
+;;  sign
 (defun sign (private message)
   (funcall *elliptic-sign* private message))
 
@@ -709,10 +752,10 @@
 ;;
 
 ;;  secp256k1, secp256r1
-(defun verify-weierstrass (public message r s)
+(defun verify-secp256k1 (public message r s)
   (and (<= 1 r (1- *elliptic-n*))
        (<= 1 s (1- *elliptic-n*))
-       (let* ((e (sign-sha-weierstrass message))
+       (let* ((e (sign-sha-secp256k1 message))
               (s1 (inverse-n s))
               (u1 (modn (* e s1)))
               (u2 (modn (* r s1)))
@@ -724,52 +767,32 @@
                   (v (modn (point2-x a))))
              (= v r))))))
 
-(defun verify-secp256k1 (public message r s)
-  (verify-weierstrass public message r s))
-
 (defun verify-secp256r1 (public message r s)
-  (verify-weierstrass public message r s))
-
+  (verify-secp256k1 public message r s))
 
 ;;  ed25519
-(defun verify-sha-ed25519 (r public message)
-  (let ((sha (make-sha512encode)))
-    (little-endian-sha512encode sha r 32)
-    (little-endian-sha512encode sha public 32)
-    (read-sha512encode sha message)
-    (modn (vector-little-integer
-            (calc-sha512encode sha)))))
-
 (defun verify-ed25519 (public message r s)
   (let ((ai (encode public))
         (rp (decode r)))
     (cond ((or (null rp)) (values nil :error))
           ((<= *elliptic-n* s) nil)
-          (t (let* ((k (verify-sha-ed25519 r ai message))
+          (t (let* ((k (sign-sha-ed25519 r ai message))
                     (x (multiple s *elliptic-g*))
                     (y (addition rp (multiple k public))))
                (equal-point x y))))))
 
-
 ;;  ed448
-(defun verify-sha-ed448 (r public message)
-  (let ((sha (make-shake-256-encode)))
-    (little-endian-sha3encode sha r 57)
-    (little-endian-sha3encode sha public 57)
-    (read-sha3encode sha message)
-    (modn (vector-little-integer
-            (result-sha3encode sha 114)))))
-
 (defun verify-ed448 (public message r s)
   (let ((ai (encode public))
         (rp (decode r)))
     (cond ((or (null rp)) (values nil :error))
           ((<= *elliptic-n* s) nil)
-          (t (let* ((k (verify-sha-ed448 r ai message))
+          (t (let* ((k (sign-sha-ed448 r ai message))
                     (x (multiple s *elliptic-g*))
                     (y (addition rp (multiple k public))))
                (equal-point x y))))))
 
+;;  verify
 (defun verify (public message r s)
   (funcall *elliptic-verify* public message r s))
 
@@ -784,14 +807,16 @@
           (*elliptic-n* ,n)
           (*elliptic-h* ,h)
           (*elliptic-o* (make-point3 0 0 0))
-          (*elliptic-valid* #'valid-weierstrass))
+          (*elliptic-valid* #'valid-weierstrass)
+          (*elliptic-neutral* #'neutral-weierstrass))
      ,@body))
 
 (defmacro with-elliptic-secp256k1 (&body body)
   (destructuring-bind (bit p a b (gx gy) n h) +elliptic-secp256k1+
     `(with-elliptic-weierstrass
        (,bit ,p ,gx ,gy ,n ,h)
-       (let* ((*elliptic-a* ,a)
+       (let* ((*elliptic-curve* :secp256k1)
+              (*elliptic-a* ,a)
               (*elliptic-b* ,b)
               (*elliptic-addition* #'addition-secp256k1)
               (*elliptic-doubling* #'doubling-secp256k1)
@@ -807,7 +832,8 @@
   (destructuring-bind (bit p a b (gx gy) n h) +elliptic-secp256r1+
     `(with-elliptic-weierstrass
        (,bit ,p ,gx ,gy ,n ,h)
-       (let* ((*elliptic-a* ,a)
+       (let* ((*elliptic-curve* :secp256r1)
+              (*elliptic-a* ,a)
               (*elliptic-b* ,b)
               (*elliptic-addition* #'addition-secp256r1)
               (*elliptic-doubling* #'doubling-secp256r1)
@@ -823,14 +849,16 @@
   `(let* ((*elliptic-bit* ,bit)
           (*elliptic-p* ,p)
           (*elliptic-n* ,n)
-          (*elliptic-h* ,h))
+          (*elliptic-h* ,h)
+          (*elliptic-neutral* #'neutral-edwards))
      ,@body))
 
 (defmacro with-elliptic-ed25519 (&body body)
   (destructuring-bind (bit p a d (gx gy) n h) +elliptic-ed25519+
     `(with-elliptic-edwards
        (,bit ,p ,n ,h)
-       (let* ((*elliptic-a* ,a)
+       (let* ((*elliptic-curve* :ed25519)
+              (*elliptic-a* ,a)
               (*elliptic-d* ,d)
               (*elliptic-g* (make-point4 ,gx ,gy))
               (*elliptic-o* (make-point4 0 1 1 0))
@@ -849,7 +877,8 @@
   (destructuring-bind (bit p a d (gx gy) n h) +elliptic-ed448+
     `(with-elliptic-edwards
        (,bit ,p ,n ,h)
-       (let* ((*elliptic-a* ,a)
+       (let* ((*elliptic-curve* :ed448)
+              (*elliptic-a* ,a)
               (*elliptic-d* ,d)
               (*elliptic-g* (make-point3 ,gx ,gy))
               (*elliptic-o* (make-point3 0 1 1))
