@@ -1,11 +1,8 @@
-(load #p"../sha.lisp")
-(load #p"../elliptic.lisp")
-
 (defpackage work (:use common-lisp elliptic))
 (in-package work)
 
 ;;
-;;  Main
+;;  sign, verify
 ;;
 (defun main-verify ()
   (let* ((private (make-private))

@@ -11,6 +11,7 @@
     #:*elliptic-n*
     #:*elliptic-h*
     #:*elliptic-o*
+    #:*elliptic-context*
 
     #:point2
     #:make-point2
@@ -108,6 +109,7 @@
 (defvar *elliptic-n*)
 (defvar *elliptic-h*)
 (defvar *elliptic-o*)
+(defvar *elliptic-context*)
 (defvar *elliptic-valid*)
 (defvar *elliptic-neutral*)
 (defvar *elliptic-addition*)
@@ -689,8 +691,8 @@
 
 (defun sign-loop-secp256k1 (private message)
   (let* ((k (make-private))
-         (a (affine (make-public k)))
-         (r (modn (point2-x a))))
+         (b (affine (make-public k)))
+         (r (modn (point2-x b))))
     (unless (zerop r)
       (let* ((e (sign-sha-secp256k1 message))
              (s (modn (* (inverse-n k) (+ e (* r private))))))
@@ -716,18 +718,16 @@
             (calc-sha512encode sha)))))
 
 (defun sign-ed25519 (private message)
-  (multiple-value-bind (a prefix) (make-public-sign-ed25519 private)
-    (let* ((ag (multiple a *elliptic-g*))
-           (ae (encode ag))
-           (rp (sign-sha-ed25519 prefix nil message))
-           (rg (multiple rp *elliptic-g*))
-           (re (encode rg))
-           (h (sign-sha-ed25519 re ae message))
-           (s (modn (+ rp (* h a)))))
-      (values re s))))
+  (multiple-value-bind (u v) (make-public-sign-ed25519 private)
+    (let* ((a (encode (multiple u *elliptic-g*)))
+           (w (sign-sha-ed25519 v nil message))
+           (r (encode (multiple w *elliptic-g*)))
+           (k (sign-sha-ed25519 r a message))
+           (s (modn (+ w (* k u)))))
+      (values r s))))
 
 ;;  ed448
-(defun sign-sha-ed448 (x y message &optional (sha1 0) (sha2 #()))
+(defun sign-sha-ed448 (x y message &optional (sha1 0) (sha2 *elliptic-context*))
   (let ((sha (make-shake-256-encode)))
     (read-sha3encode sha (map 'vector #'char-code "SigEd448"))
     (byte-sha3encode sha sha1)
@@ -740,15 +740,13 @@
             (result-sha3encode sha 114)))))
 
 (defun sign-ed448 (private message)
-  (multiple-value-bind (a prefix) (make-public-sign-ed448 private)
-    (let* ((ag (multiple a *elliptic-g*))
-           (ae (encode ag))
-           (rp (sign-sha-ed448 prefix nil message))
-           (rg (multiple rp *elliptic-g*))
-           (re (encode rg))
-           (h (sign-sha-ed448 re ae message))
-           (s (modn (+ rp (* h a)))))
-      (values re s))))
+  (multiple-value-bind (u v) (make-public-sign-ed448 private)
+    (let* ((a (encode (multiple u *elliptic-g*)))
+           (w (sign-sha-ed448 v nil message))
+           (r (encode (multiple w *elliptic-g*)))
+           (k (sign-sha-ed448 r a message))
+           (s (modn (+ w (* k u)))))
+      (values r s))))
 
 ;;  sign
 (defun sign (private message)
@@ -767,11 +765,11 @@
               (s1 (inverse-n s))
               (u1 (modn (* e s1)))
               (u2 (modn (* r s1)))
-              (rp (addition
-                    (multiple u1 *elliptic-g*)
-                    (multiple u2 public))))
-         (unless (zerop (point3-z rp))
-           (let* ((a (affine rp))
+              (p (addition
+                   (multiple u1 *elliptic-g*)
+                   (multiple u2 public))))
+         (unless (zerop (point3-z p))
+           (let* ((a (affine p))
                   (v (modn (point2-x a))))
              (= v r))))))
 
@@ -780,24 +778,24 @@
 
 ;;  ed25519
 (defun verify-ed25519 (public message r s)
-  (let ((ai (encode public))
-        (rp (decode r)))
-    (cond ((or (null rp)) (values nil :error))
+  (let ((a (encode public))
+        (p (decode r)))
+    (cond ((or (null p)) (values nil :error))
           ((<= *elliptic-n* s) nil)
-          (t (let* ((k (sign-sha-ed25519 r ai message))
+          (t (let* ((k (sign-sha-ed25519 r a message))
                     (x (multiple s *elliptic-g*))
-                    (y (addition rp (multiple k public))))
+                    (y (addition p (multiple k public))))
                (equal-point x y))))))
 
 ;;  ed448
 (defun verify-ed448 (public message r s)
-  (let ((ai (encode public))
-        (rp (decode r)))
-    (cond ((or (null rp)) (values nil :error))
+  (let ((a (encode public))
+        (p (decode r)))
+    (cond ((or (null p)) (values nil :error))
           ((<= *elliptic-n* s) nil)
-          (t (let* ((k (sign-sha-ed448 r ai message))
+          (t (let* ((k (sign-sha-ed448 r a message))
                     (x (multiple s *elliptic-g*))
-                    (y (addition rp (multiple k public))))
+                    (y (addition p (multiple k public))))
                (equal-point x y))))))
 
 ;;  verify
@@ -890,6 +888,7 @@
               (*elliptic-d* ,d)
               (*elliptic-g* (make-point3 ,gx ,gy))
               (*elliptic-o* (make-point3 0 1 1))
+              (*elliptic-context* #())
               (*elliptic-valid* #'valid-edwards)
               (*elliptic-addition* #'addition-ed448)
               (*elliptic-doubling* #'doubling-ed448)
