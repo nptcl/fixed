@@ -466,19 +466,23 @@
 ;;
 
 ;;  secp256k1, secp256r1 -> vector
+(defun encode-compress-secp256k1 (x y)
+  (integer-big-vector
+    (logior (ash (if (logbitp 0 y) #x03 #x02) 256) x)
+    (1+ 32)))
+
+(defun encode-uncompress-secp256k1 (x y)
+  (integer-big-vector
+    (logior (ash #x04 (* 256 2)) (ash x 256) y)
+    (1+ 64)))
+
 (defun encode-secp256k1 (v &optional (compress t))
   (let ((x (point3-x v))
         (y (point3-y v))
         (z (point3-z v)))
-    (cond ((zerop z)
-           (integer-big-vector #x00 1))
-          ((null compress)
-           (integer-big-vector
-             (logior (ash #x04 (* 256 2)) (ash x 256) y)
-             (1+ 64)))
-          (t (integer-big-vector
-               (logior (ash (if (logbitp 0 y) #x03 #x02) 256) x)
-               (1+ 32))))))
+    (cond ((zerop z) (integer-big-vector #x00 1))
+          (compress (encode-compress-secp256k1 x y))
+          (t (encode-uncompress-secp256k1 x y)))))
 
 (defun encode-secp256r1 (v &optional (compress t))
   (encode-secp256k1 v compress))
@@ -510,8 +514,8 @@
 ;;
 
 ;;  secp256k1, secp256r1 <- vector
-(defun decode-compress-secp256k1 (v y0)
-  (let* ((x (vector-big-integer v :start 1 :end 33))
+(defun decode-compress-secp256k1 (k y0)
+  (let* ((x (vector-big-integer k :start 1 :end 33))
          (a (modp (+ (* x x x) (* *elliptic-a* x) *elliptic-b*)))
          (y (square-root-mod-4 a)))
     (when y
@@ -519,22 +523,22 @@
         (setq y (- *elliptic-p* y)))
       (make-point3 x y))))
 
-(defun decode-uncompress-secp256k1 (v)
+(defun decode-uncompress-secp256k1 (k)
   (let ((p (make-point3
-             (vector-big-integer v :start 1 :end 33)
-             (vector-big-integer v :start 33 :end 65))))
+             (vector-big-integer k :start 1 :end 33)
+             (vector-big-integer k :start 33 :end 65))))
     (when (valid p)
       p)))
 
-(defun decode-secp256k1 (v)
-  (case (aref v 0)
+(defun decode-secp256k1 (k)
+  (case (aref k 0)
     (#x00 (make-point3 0 0 0))
-    (#x02 (decode-compress-secp256k1 v 0))
-    (#x03 (decode-compress-secp256k1 v 1))
-    (#x04 (decode-uncompress-secp256k1 v))))
+    (#x02 (decode-compress-secp256k1 k 0))
+    (#x03 (decode-compress-secp256k1 k 1))
+    (#x04 (decode-uncompress-secp256k1 k))))
 
-(defun decode-secp256r1 (v)
-  (decode-secp256k1 v))
+(defun decode-secp256r1 (k)
+  (decode-secp256k1 k))
 
 ;;  ed25519 <- integer
 (defun decode-ed25519-x (y)
@@ -553,9 +557,9 @@
             ((= v1x2 (- *elliptic-p* u1))
              (mulp x (power-mod 2 (/ (1- *elliptic-p*) 4) *elliptic-p*)))))))
 
-(defun decode-ed25519 (r)
-  (let* ((y (ldb (byte 255 0) r))
-         (x0 (ldb (byte 1 255) r))
+(defun decode-ed25519 (k)
+  (let* ((y (ldb (byte 255 0) k))
+         (x0 (ldb (byte 1 255) k))
          (x (decode-ed25519-x y)))
     (cond ((null x) nil)
           ((and (= x 0) (= x0 1)) nil)
@@ -580,18 +584,18 @@
       (when (= v1x2 u1)
         x))))
 
-;;  decode
-(defun decode-ed448 (r)
-  (let* ((y (ldb (byte 455 0) r))
-         (x0 (ldb (byte 1 455) r))
+(defun decode-ed448 (k)
+  (let* ((y (ldb (byte 455 0) k))
+         (x0 (ldb (byte 1 455) k))
          (x (decode-ed448-x y)))
     (cond ((null x) nil)
           ((and (= x 0) (= x0 1)) nil)
           ((/= (logand x #x01) x0) (make-point3 (- *elliptic-p* x) y))
           (t (make-point3 x y)))))
 
-(defun decode (r)
-  (funcall *elliptic-decode* r))
+;;  decode
+(defun decode (k)
+  (funcall *elliptic-decode* k))
 
 
 ;;
@@ -605,7 +609,7 @@
       (calc-sha256encode sha))))
 
 (defun make-private-secp256k1 ()
-  (let ((x (modp (make-private-256bit))))
+  (let ((x (modn (make-private-256bit))))
     (if (zerop x)
       (make-private-secp256k1)
       x)))
