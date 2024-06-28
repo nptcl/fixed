@@ -49,6 +49,15 @@
     #:sign
     #:verify
 
+    #:encode1-vector
+    #:encode2-vector
+    #:encode1-string
+    #:encode2-string
+    #:decode1-vector
+    #:decode2-vector
+    #:decode1-string
+    #:decode2-string
+
     #:with-elliptic-secp256k1
     #:with-elliptic-secp256r1
     #:with-elliptic-ed25519
@@ -118,6 +127,10 @@
 (defvar *elliptic-make-public*)
 (defvar *elliptic-encode*)
 (defvar *elliptic-decode*)
+(defvar *elliptic-encode1*)
+(defvar *elliptic-encode2*)
+(defvar *elliptic-decode1*)
+(defvar *elliptic-decode2*)
 (defvar *elliptic-sign*)
 (defvar *elliptic-verify*)
 
@@ -479,9 +492,10 @@
     (1+ 64)))
 
 (defun encode-secp256k1 (v &optional (compress t))
-  (let ((x (point3-x v))
-        (y (point3-y v))
-        (z (point3-z v)))
+  (let* ((a (affine v))
+         (x (point2-x a))
+         (y (point2-y a))
+         (z (point3-z v)))
     (cond ((zerop z) (integer-big-vector #x00 1))
           (compress (encode-compress-secp256k1 x y))
           (t (encode-uncompress-secp256k1 x y)))))
@@ -804,6 +818,125 @@
 
 
 ;;
+;;  encode / decode
+;;
+(defun encode1-secp256k1 (v)
+  (integer-big-vector v 32))
+
+(defun encode1-secp256r1 (v)
+  (integer-big-vector v 32))
+
+(defun encode1-ed25519 (v)
+  (integer-little-vector v 32))
+
+(defun encode1-ed448 (v)
+  (integer-little-vector v 57))
+
+(defun encode2-secp256k1 (&rest args)
+  (apply #'encode-secp256k1 args))
+
+(defun encode2-secp256r1 (&rest args)
+  (apply #'encode-secp256r1 args))
+
+(defun encode2-ed25519 (v)
+  (integer-little-vector (encode-ed25519 v) 32))
+
+(defun encode2-ed448 (v)
+  (integer-little-vector (encode-ed448 v) 57))
+
+(defun decode1-secp256k1 (v)
+  (when (= (length v) 32)
+    (vector-big-integer v)))
+
+(defun decode1-secp256r1 (v)
+  (when (= (length v) 32)
+    (vector-big-integer v)))
+
+(defun decode1-ed25519 (v)
+  (when (= (length v) 32)
+    (vector-little-integer v)))
+
+(defun decode1-ed448 (v)
+  (when (= (length v) 57)
+    (vector-little-integer v)))
+
+(defun decode2-secp256k1 (v)
+  (let ((n (length v)))
+    (when (or (= n 1) (= n 33) (= n 65))
+      (decode-secp256k1 v))))
+
+(defun decode2-secp256r1 (v)
+  (let ((n (length v)))
+    (when (or (= n 1) (= n 33) (= n 65))
+      (decode-secp256r1 v))))
+
+(defun decode2-ed25519 (v)
+  (when (= (length v) 32)
+    (decode-ed25519
+      (vector-little-integer v))))
+
+(defun decode2-ed448 (v)
+  (when (= (length v) 57)
+    (decode-ed448
+      (vector-little-integer v))))
+
+
+;;  interface
+(defun encode1-vector (v)
+  (funcall *elliptic-encode1* v))
+
+(defun encode2-vector (&rest args)
+  (apply *elliptic-encode2* args))
+
+(defun encode-hexadecimal (x s)
+  (format s "~2,'0X" x))
+
+(defun encode-string (v)
+  (when v
+    (with-output-to-string (s)
+      (map nil (lambda (x) (encode-hexadecimal x s)) v))))
+
+(defun encode1-string (v)
+  (encode-string
+    (encode1-vector v)))
+
+(defun encode2-string (&rest args)
+  (encode-string
+    (apply #'encode2-vector args)))
+
+(defun decode1-vector (v)
+  (when v
+    (funcall *elliptic-decode1* v)))
+
+(defun decode2-vector (v)
+  (when v
+    (funcall *elliptic-decode2* v)))
+
+(defun decode-string (str)
+  (multiple-value-bind (len2 zero) (truncate (length str) 2)
+    (when (zerop zero)
+      (let ((r (make-array len2 :element-type '(unsigned-byte 8)))
+            invalid)
+        (dotimes (i len2)
+          (let* ((i2 (* i 2))
+                 (hex (subseq str i2 (+ i2 2)))
+                 (value (parse-integer hex :junk-allowed t :radix 16)))
+            (if value
+              (setf (aref r i) value)
+              (setq invalid t))))
+        (unless invalid
+          r)))))
+
+(defun decode1-string (v)
+  (decode1-vector
+    (decode-string v)))
+
+(defun decode2-string (v)
+  (decode2-vector
+    (decode-string v)))
+
+
+;;
 ;;  Curve
 ;;
 (defmacro with-elliptic-weierstrass ((bit p gx gy n h) &body body)
@@ -831,7 +964,11 @@
               (*elliptic-encode* #'encode-secp256k1)
               (*elliptic-decode* #'decode-secp256k1)
               (*elliptic-sign* #'sign-secp256k1)
-              (*elliptic-verify* #'verify-secp256k1))
+              (*elliptic-verify* #'verify-secp256k1)
+              (*elliptic-encode1* #'encode1-secp256k1)
+              (*elliptic-encode2* #'encode2-secp256k1)
+              (*elliptic-decode1* #'decode1-secp256k1)
+              (*elliptic-decode2* #'decode2-secp256k1))
          ,@body))))
 
 (defmacro with-elliptic-secp256r1 (&body body)
@@ -848,7 +985,11 @@
               (*elliptic-encode* #'encode-secp256r1)
               (*elliptic-decode* #'decode-secp256r1)
               (*elliptic-sign* #'sign-secp256r1)
-              (*elliptic-verify* #'verify-secp256r1))
+              (*elliptic-verify* #'verify-secp256r1)
+              (*elliptic-encode1* #'encode1-secp256r1)
+              (*elliptic-encode2* #'encode2-secp256r1)
+              (*elliptic-decode1* #'decode1-secp256r1)
+              (*elliptic-decode2* #'decode2-secp256r1))
          ,@body))))
 
 (defmacro with-elliptic-edwards ((bit p n h) &body body)
@@ -876,7 +1017,11 @@
               (*elliptic-encode* #'encode-ed25519)
               (*elliptic-decode* #'decode-ed25519)
               (*elliptic-sign* #'sign-ed25519)
-              (*elliptic-verify* #'verify-ed25519))
+              (*elliptic-verify* #'verify-ed25519)
+              (*elliptic-encode1* #'encode1-ed25519)
+              (*elliptic-encode2* #'encode2-ed25519)
+              (*elliptic-decode1* #'decode1-ed25519)
+              (*elliptic-decode2* #'decode2-ed25519))
          ,@body))))
 
 (defmacro with-elliptic-ed448 (&body body)
@@ -897,6 +1042,44 @@
               (*elliptic-encode* #'encode-ed448)
               (*elliptic-decode* #'decode-ed448)
               (*elliptic-sign* #'sign-ed448)
-              (*elliptic-verify* #'verify-ed448))
+              (*elliptic-verify* #'verify-ed448)
+              (*elliptic-encode1* #'encode1-ed448)
+              (*elliptic-encode2* #'encode2-ed448)
+              (*elliptic-decode1* #'decode1-ed448)
+              (*elliptic-decode2* #'decode2-ed448))
          ,@body))))
+
+
+;;
+;;  (defun verify-string (public message r s)
+;;    (verify (decode2-string public)
+;;            (map 'vector #'char-code message)
+;;            (decode1-string r)
+;;            (decode1-string s)))
+;;
+;;  (with-elliptic-secp256k1
+;;    (verify-string
+;;      "03FEEF09658067CFBE3BE8685DDCE8E9C03B4A397ADC4A0255CE0B29FC63BCDC9C"
+;;      "Hello"
+;;      "7C7EDD22B0AED24D1B4A3826E228CE52EC897D52826D5912459238FC36008B86"
+;;      "38C86C613A977CD5D1E024380FB56CDB924B0D972E903AB740F4E7F3A90F62BC"))
+;;  (with-elliptic-secp256r1
+;;    (verify-string
+;;      "03CD92CF7B1C9CE9858383806B8540D72FB022BE577E21DE02B8EAA27371DB7AF2"
+;;      "Hello"
+;;      "FF6331919D62BFF9236113998250AB9079AA81C83085A27CC38A2CC0EEDDD98D"
+;;      "1A374ADE37A61F6014C29C723C425BB3E6B519D517E16F66A46869F8EC535F89"))
+;;  (with-elliptic-ed25519
+;;    (verify-string
+;;      "75AB16F53A060E7AF9A4B8ECEA3D4DEF058AED2C626FEC96D5505C4A7D922960"
+;;      "Hello"
+;;      "285D61D0DAC982F09365DA699DFD10A7B1B3A4D29A8468655A71F49965D4CEE1"
+;;      "A58118E7ECAE263034F4BA7EB57BEE8D639C9BAF5BDE6BE97F2F864B3A1A7606"))
+;;  (with-elliptic-ed448
+;;    (verify-string
+;;      "99AFC3768EE41B96F208EBAF8627908690DC6A5AC64659F93D0A46C2092B61E84AD14DD03F7B3F146799C29F65682126D517B7E1EA57716E00"
+;;      "Hello"
+;;      "DC38653AAD2F456132602EBC47571DABB56C36BA35D6965F820AFFB0FBE478439C7CF1D9EE7033792A23E80811CFAB07DC2B71DDEF526F6700"
+;;      "0E11296ECFACEA4E5E9B795AC4048D711636BE468A99639F953ED1E948A6351F51DE0AE167EB268012E9712F7D6ADD97E80BB36E291C2A2D00"))
+;;
 

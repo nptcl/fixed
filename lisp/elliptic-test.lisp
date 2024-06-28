@@ -950,6 +950,177 @@
 
 
 ;;
+;;  encode-string
+;;
+(deftest encode1-vector.1
+  (with-elliptic-secp256k1
+    (values
+      (length (encode1-vector 0))
+      (length (encode1-string 0))))
+  32 64)
+
+(deftest encode1-vector.2
+  (with-elliptic-secp256r1
+    (values
+      (length (encode1-vector 0))
+      (length (encode1-string 0))))
+  32 64)
+
+(deftest encode1-vector.3
+  (with-elliptic-ed25519
+    (values
+      (length (encode1-vector 0))
+      (length (encode1-string 0))))
+  32 64)
+
+(deftest encode1-vector.4
+  (with-elliptic-ed448
+    (values
+      (length (encode1-vector 0))
+      (length (encode1-string 0))))
+  57 114)
+
+(defun encode-decode-private (private1)
+  (with-elliptic-values
+    (let* ((public1 (make-public private1))
+           (private2 (decode1-vector (encode1-vector private1)))
+           (public2 (decode2-vector (encode2-vector public1))))
+      (and (= private1 private2)
+           (equal-point public1 public2)))))
+
+(deftest encode-decode.1
+  (encode-decode-private #x00)
+  t t t t)
+
+(deftest encode-decode.2
+  (encode-decode-private #x01)
+  t t t t)
+
+(deftest encode-decode.3
+  (encode-decode-private #x12345678)
+  t t t t)
+
+(defun encode-check-private (private)
+  (let ((public (make-public private)))
+    (values (encode1-string private)
+            (encode2-string public))))
+
+(deftest encode-check.1
+  (with-elliptic-secp256k1
+    (encode-check-private #x00))
+  "0000000000000000000000000000000000000000000000000000000000000000"
+  "00")
+
+(deftest encode-check.2
+  (with-elliptic-secp256r1
+    (encode-check-private #x00))
+  "0000000000000000000000000000000000000000000000000000000000000000"
+  "00")
+
+(deftest encode-check.3
+  (with-elliptic-ed25519
+    (encode-check-private #x00))
+  "0000000000000000000000000000000000000000000000000000000000000000"
+  "3B6A27BCCEB6A42D62A3A8D02A6F0D73653215771DE243A63AC048A18B59DA29")
+
+(deftest encode-check.4
+  (with-elliptic-ed448
+    (encode-check-private #x00))
+  "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+  "5B3AFE03878A49B28232D4F1A442AEBDE109F807ACEF7DFD9A7F65B962FE52D6547312CACECFF04337508F9D2529A8F1669169B21C32C48000")
+
+(deftest encode-check.5
+  (with-elliptic-secp256k1
+    (encode-check-private #x01))
+  "0000000000000000000000000000000000000000000000000000000000000001"
+  "0279BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798")
+
+(deftest encode-check.6
+  (with-elliptic-secp256r1
+    (encode-check-private #x01))
+  "0000000000000000000000000000000000000000000000000000000000000001"
+  "036B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296")
+
+(deftest encode-check.7
+  (with-elliptic-ed25519
+    (encode-check-private #x01))
+  "0100000000000000000000000000000000000000000000000000000000000000"
+  "CECC1507DC1DDD7295951C290888F095ADB9044D1B73D696E6DF065D683BD4FC")
+
+(deftest encode-check.8
+  (with-elliptic-ed448
+    (encode-check-private #x00))
+  "010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+  "0572C14CB1307744B92F3837F99639ABBB20FFC471D89D9D545349DC700E0127491F061314FAF89A85C70760BD0188A5669D1A4393F0834B80")
+
+(deftest encode-check.9
+  (with-elliptic-secp256k1
+    (encode-check-private #x12345678))
+  "0000000000000000000000000000000000000000000000000000000012345678"
+  "034CF7A9777C51AFD98A605CC8DC54787686E632D716EBC6F186D40760845344C3")
+
+(deftest encode-check.10
+  (with-elliptic-secp256r1
+    (encode-check-private #x12345678))
+  "0000000000000000000000000000000000000000000000000000000012345678"
+  "02E40245B7DE085C2604AA63F2E80B72CC80FA7C46891628A4271B5FF88E2131CA")
+
+(deftest encode-check.11
+  (with-elliptic-ed25519
+    (encode-check-private #x12345678))
+  "7856341200000000000000000000000000000000000000000000000000000000"
+  "487FBDF3E0B73CE5755840F821BE10D327729FBF612D2BB4F050ED34354447C9")
+
+(deftest encode-check.12
+  (with-elliptic-ed448
+    (encode-check-private #x12345678))
+  "785634120000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+  "0281C83E14A86BC6A8CFA54F18E8677EC1FB4F08DA87712CBF243A394F7006DADD41ED2ABD4A7DBAFC11402854A280112910A53DDA30D2D200")
+
+(defun verify-string (public message r s)
+  (verify (decode2-string public)
+          (map 'vector #'char-code message)
+          (decode1-string r)
+          (decode1-string s)))
+
+(deftest elliptic-signature.1
+  (with-elliptic-secp256k1
+    (verify-string
+      "03FEEF09658067CFBE3BE8685DDCE8E9C03B4A397ADC4A0255CE0B29FC63BCDC9C"
+      "Hello"
+      "7C7EDD22B0AED24D1B4A3826E228CE52EC897D52826D5912459238FC36008B86"
+      "38C86C613A977CD5D1E024380FB56CDB924B0D972E903AB740F4E7F3A90F62BC"))
+  t)
+
+(deftest elliptic-signature.2
+  (with-elliptic-secp256r1
+    (verify-string
+      "03CD92CF7B1C9CE9858383806B8540D72FB022BE577E21DE02B8EAA27371DB7AF2"
+      "Hello"
+      "FF6331919D62BFF9236113998250AB9079AA81C83085A27CC38A2CC0EEDDD98D"
+      "1A374ADE37A61F6014C29C723C425BB3E6B519D517E16F66A46869F8EC535F89"))
+  t)
+
+(deftest elliptic-signature.3
+  (with-elliptic-ed25519
+    (verify-string
+      "75AB16F53A060E7AF9A4B8ECEA3D4DEF058AED2C626FEC96D5505C4A7D922960"
+      "Hello"
+      "285D61D0DAC982F09365DA699DFD10A7B1B3A4D29A8468655A71F49965D4CEE1"
+      "A58118E7ECAE263034F4BA7EB57BEE8D639C9BAF5BDE6BE97F2F864B3A1A7606"))
+  t)
+
+(deftest elliptic-signature.4
+  (with-elliptic-ed448
+    (verify-string
+      "99AFC3768EE41B96F208EBAF8627908690DC6A5AC64659F93D0A46C2092B61E84AD14DD03F7B3F146799C29F65682126D517B7E1EA57716E00"
+      "Hello"
+      "DC38653AAD2F456132602EBC47571DABB56C36BA35D6965F820AFFB0FBE478439C7CF1D9EE7033792A23E80811CFAB07DC2B71DDEF526F6700"
+      "0E11296ECFACEA4E5E9B795AC4048D711636BE468A99639F953ED1E948A6351F51DE0AE167EB268012E9712F7D6ADD97E80BB36E291C2A2D00"))
+  t)
+
+
+;;
 ;;  main
 ;;
 (let ((*random-state* (make-random-state t)))
