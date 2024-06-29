@@ -172,7 +172,7 @@
   (with-elliptic-values
     (let ((g *elliptic-g*)
           (o *elliptic-o*))
-      (equal-point (addition g o) g)))
+      (equal-point (addition o g) g)))
   t t t t)
 
 ;;  addition G+O
@@ -180,7 +180,7 @@
   (with-elliptic-values
     (let ((g *elliptic-g*)
           (o *elliptic-o*))
-      (equal-point (addition o g) g)))
+      (equal-point (addition g o) g)))
   t t t t)
 
 ;;  addition O+O

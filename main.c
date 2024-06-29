@@ -1,6 +1,10 @@
 #include <stdio.h>
+#include "addition.h"
 #include "fixed.h"
 #include "crypt.h"
+#include "elliptic.h"
+#include "random.h"
+#include "signature.h"
 
 /*
  *  main
@@ -18,11 +22,14 @@ int main(void)
 	fixsize bit_count, stack_size;
 	fixptr e, d, n;
 	fixptr x1, x2, x3, x4, x5;
+	struct fixed_random state;
 
 	bit_count = 256;
 	stack_size = 100;
 
-	init_fixed();
+	init_fixrandom();
+	make_fixrandom(&state);
+
 	s = make_fixed(bit_count, stack_size);
 	if (s == NULL) {
 		fprintf(stderr, "make_fixed error.\n");
@@ -31,7 +38,7 @@ int main(void)
 
 	/* rsakey */
 	make_prime_output = 1;
-	make_rsakey_fixed(s, bit_count, 0);
+	make_rsakey_fixed(s, &state, bit_count, 0);
 	output_main(s, 4, "e: ");
 	output_main(s, 3, "d: ");
 	output_main(s, 2, "n: ");

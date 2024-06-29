@@ -1,5 +1,110 @@
 #include "fixed.h"
+#include "random.h"
 #include <stdlib.h>
+
+/***********************************************************************
+ *  random
+ ***********************************************************************/
+static fixnum random_number_fixnum(struct fixed_random *state)
+{
+	return (fixnum)number64_sha_fixrandom(state);
+}
+
+static fixnum random_equal_fixnum(struct fixed_random *state, fixnum value)
+{
+	return (fixnum)equal64_sha_fixrandom(state, (uint64_t)value);
+}
+
+static int random_loop_fixptr(struct fixed_random *state,
+		fixptr r, fixsize size, int less)
+{
+	fixsize index, i;
+	fixnum x, y;
+
+	/* r -> 0...r */
+	index = size - 1;
+	x = r[index];
+	y = random_equal_fixnum(state, x);
+	if (x != y)
+		goto tail;
+	for (i = 1; i < size; i++) {
+		index = size - i - 1;
+		x = r[index];
+		y = random_number_fixnum(state);
+		if (x < y)
+			return 1;
+		if (x > y)
+			goto tail;
+	}
+	return less;
+
+tail:
+	r[index] = y;
+	for (i = 0; i < index; i++)
+		r[i] = random_number_fixnum(state);
+	return 0;
+}
+
+static void random_fixptr(struct fixed_random *state,
+		fixptr x, fixptr r, fixsize size, int less)
+{
+	if (x != r)
+		memcpy_fixptr(r, x, size);
+
+	/* size */
+	size = size_press_fixptr(r, size);
+	if (size == 0) /* all zero */
+		return;
+
+	/* random */
+	while (random_loop_fixptr(state, r, size, less))
+		continue;
+}
+
+void random_equal_fixptr(struct fixed_random *state, fixptr x, fixptr r, fixsize size)
+{
+	random_fixptr(state, x, r, size, 0);
+}
+
+void random_less_fixptr(struct fixed_random *state, fixptr x, fixptr r, fixsize size)
+{
+	random_fixptr(state, x, r, size, 1);
+}
+
+void random_equal_fixed(fixed s, struct fixed_random *state)
+{
+	fixptr x, r;
+
+	/* stack: x -> r */
+	x = top1_fixed(s);
+	r = push1get_fixed(s);
+	random_equal_fixptr(state, x, r, s->word1);
+	shift1_fixed(s, 1, 1);
+}
+
+void random_less_fixed(fixed s, struct fixed_random *state)
+{
+	fixptr x, r;
+
+	/* stack: x -> r */
+	x = top1_fixed(s);
+	r = push1get_fixed(s);
+	random_less_fixptr(state, x, r, s->word1);
+	shift1_fixed(s, 1, 1);
+}
+
+void random_full_fixptr(struct fixed_random *state, fixptr x, fixsize size)
+{
+	fixsize i;
+	for (i = 0; i < size; i++)
+		x[i] = (fixnum)random_number_fixnum(state);
+}
+
+void random_full_fixed(fixed s, struct fixed_random *state)
+{
+	random_full_fixptr(state, push1get_fixed(s), s->word1);
+}
+
 
 /***********************************************************************
  *  power_mod
@@ -59,7 +164,7 @@ void power_mod_fixed(fixed s)
 /***********************************************************************
  *  prime
  ***********************************************************************/
-static int prime_loop_p(fixed s, fixptr x, int k)
+static int prime_loop_p(fixed s, struct fixed_random *state, fixptr x, int k)
 {
 	int i, check, result;
 	fixptr n1, n2, a, b, c, z;
@@ -87,7 +192,7 @@ static int prime_loop_p(fixed s, fixptr x, int k)
 		/* a */
 		memcpy_fixptr(a, x, word1);
 		subv_fixptr(a, word1, 1, &ignore);
-		random_equal_fixptr(s, a, a, word1);
+		random_equal_fixptr(state, a, a, word1);
 		addv_fixptr(a, word1, 1, &ignore);
 		/* b */
 		memcpy_fixptr(b, n2, word1);
@@ -121,7 +226,7 @@ static int prime_loop_p(fixed s, fixptr x, int k)
 	return result;
 }
 
-static int prime_p(fixed s, fixptr x, int k)
+static int prime_p(fixed s, struct fixed_random *state, fixptr x, int k)
 {
 	if (compare_fixnum_fixptr(x, s->word1, 2) == 0)
 		return 1; /* 2 */
@@ -130,10 +235,10 @@ static int prime_p(fixed s, fixptr x, int k)
 	if ((x[0] & 0x01) == 0)
 		return 0; /* even */
 
-	return prime_loop_p(s, x, k);
+	return prime_loop_p(s, state, x, k);
 }
 
-static void prime_random(fixed s, fixptr x, unsigned bit)
+static void prime_random(fixed s, struct fixed_random *state, fixptr x, unsigned bit)
 {
 	fixsize word1, q, r;
 	fixnum ignore;
@@ -141,7 +246,7 @@ static void prime_random(fixed s, fixptr x, unsigned bit)
 	/* full */
 	word1 = s->word1;
 	if (s->bit1 <= bit) {
-		random_full_fixptr(s, x, word1);
+		random_full_fixptr(state, x, word1);
 		x[0] |= 1;
 		x[word1 - 1] |= 1ULL << (FIXED_FULLBIT - 1ULL);
 		return;
@@ -151,7 +256,7 @@ static void prime_random(fixed s, fixptr x, unsigned bit)
 	setv_fixptr(x, word1, 1);
 	shiftl_fixptr(x, word1, bit);
 	subv_fixptr(x, word1, 1, &ignore);
-	random_equal_fixptr(s, x, x, s->word1);
+	random_equal_fixptr(state, x, x, s->word1);
 	x[0] |= 1;
 	bit--;
 	q = bit / FIXED_FULLBIT;
@@ -177,7 +282,7 @@ static int prime_times(fixsize bit)
 
 /* (empty) -> r */
 int make_prime_output = 0;
-void make_prime_fixptr(fixed s, unsigned bit, fixptr r)
+void make_prime_fixptr(fixed s, struct fixed_random *state, unsigned bit, fixptr r)
 {
 	int k, i;
 
@@ -193,8 +298,8 @@ void make_prime_fixptr(fixed s, unsigned bit, fixptr r)
 			fprintf(stdout, ".");
 			fflush(stdout);
 		}
-		prime_random(s, r, bit);
-		if (prime_p(s, r, k))
+		prime_random(s, state, r, bit);
+		if (prime_p(s, state, r, k))
 			break;
 	}
 	if (make_prime_output) {
@@ -203,11 +308,11 @@ void make_prime_fixptr(fixed s, unsigned bit, fixptr r)
 	}
 }
 
-void make_prime_fixed(fixed s, unsigned bit)
+void make_prime_fixed(fixed s, struct fixed_random *state, unsigned bit)
 {
 	fixptr r;
 	r = push1get_fixed(s);
-	make_prime_fixptr(s, bit, r);
+	make_prime_fixptr(s, state, bit, r);
 }
 
 
@@ -313,7 +418,8 @@ static void rsa_number_d(fixed s, fixptr d, fixptr e, fixptr pq1)
 	pop2n_fixed(s, 2);
 }
 
-void make_rsakey_fixed(fixed s, unsigned bit, unsigned value_e)
+void make_rsakey_fixed(fixed s, struct fixed_random *state,
+		unsigned bit, unsigned value_e)
 {
 	unsigned half_bit;
 	fixptr e, d, n, p, q, z, pq1, p1, q1;
@@ -337,8 +443,8 @@ void make_rsakey_fixed(fixed s, unsigned bit, unsigned value_e)
 	z = push2get_fixed(s); /* 2 */
 	/* e, p, q, n */
 	setu_fixptr(e, word1, value_e);
-	make_prime_fixptr(s, half_bit, p);
-	make_prime_fixptr(s, half_bit, q);
+	make_prime_fixptr(s, state, half_bit, p);
+	make_prime_fixptr(s, state, half_bit, q);
 	mul_fixptr(p, q, word1, z, word2);
 	memcpy_fixptr(n, z, word1);
 	/* p-1, q-1 */

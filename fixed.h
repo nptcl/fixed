@@ -21,41 +21,6 @@
 #endif
 #endif
 
-#if defined(FIXED_LINUX) || defined(FIXED_FREEBSD) || defined(FIXED_UNIX)
-#undef FIXED_LINUX
-#undef FIXED_FREEBSD
-#undef FIXED_UNIX
-#undef FIXED_WINDOWS
-#undef FIXED_DEFAULT
-#define FIXED_UNIX
-#elif defined(FIXED_WINDOWS)
-#undef FIXED_LINUX
-#undef FIXED_FREEBSD
-#undef FIXED_UNIX
-#undef FIXED_DEFAULT
-#elif defined(__linux__) || defined(__FreeBSD__) || defined(__unix__)
-#undef FIXED_LINUX
-#undef FIXED_FREEBSD
-#undef FIXED_UNIX
-#undef FIXED_WINDOWS
-#undef FIXED_DEFAULT
-#define FIXED_UNIX
-#elif defined(_WIN32) || defined(_WIN64)
-#undef FIXED_LINUX
-#undef FIXED_FREEBSD
-#undef FIXED_UNIX
-#undef FIXED_WINDOWS
-#undef FIXED_DEFAULT
-#define FIXED_WINDOWS
-#else
-#undef FIXED_LINUX
-#undef FIXED_FREEBSD
-#undef FIXED_UNIX
-#undef FIXED_WINDOWS
-#undef FIXED_DEFAULT
-#define FIXED_DEFAULT
-#endif
-
 /***********************************************************************
  *  typedef
  ***********************************************************************/
@@ -116,20 +81,12 @@ typedef uint32_t fixnum;
 typedef uint64_t fixnum;
 #endif
 
-struct fixed_random {
-	union {
-		uint64_t u64[2];
-		uint32_t u32[4];
-	} seed;
-};
-
 typedef fixnum *fixptr;
 typedef unsigned fixsize;
 
 struct fixed_struct {
 	unsigned carry : 1;
 	unsigned upper : 1;
-	struct fixed_random state;
 	fixptr stack;
 	fixsize index, size, word1, word2, bit1, bit2, byte1, byte2;
 
@@ -216,7 +173,6 @@ int getu_fixptr(fixptr x, fixsize size, unsigned *r);
 /*
  *  fixed
  */
-void init_fixed(void);
 fixed make_fixed(fixsize bit1, fixsize size1);
 void free_fixed(fixed s);
 
@@ -319,16 +275,12 @@ int print1_fixed(fixed s, fixsize word1, FILE *file, unsigned radix);
 int print2_fixed(fixed s, fixsize word1, FILE *file, unsigned radix);
 int println1_fixed(fixed s, fixsize word1, FILE *file, unsigned radix);
 int println2_fixed(fixed s, fixsize word1, FILE *file, unsigned radix);
+int println1_fixptr(fixed s, fixptr x, FILE *file, unsigned radix);
+int println2_fixptr(fixed s, fixptr x, FILE *file, unsigned radix);
 
 /* binary I/O */
 void input_fixptr(fixptr r, fixsize word, const void *p, size_t size, int little);
 void output_fixptr(fixptr x, fixsize word, void *p, size_t size, int little);
-
-/* random */
-void random_equal_fixptr(fixed s, fixptr x, fixptr r, fixsize size);
-void random_equal_fixed(fixed s);
-void random_full_fixptr(fixed s, fixptr x, fixsize size);
-void random_full_fixed(fixed s);
 
 /* operator */
 void inc1s_fixed(fixed s);

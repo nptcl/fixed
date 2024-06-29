@@ -10,157 +10,6 @@
 #define FIXED_RADIX(x)				(2 <= (x) && (x) <= 36)
 
 /***********************************************************************
- *  xorshift
- ***********************************************************************/
-#define FIXRANDOM_MASK64BIT 0xFFFFFFFFFFFFFFFFULL
-
-static int fixed_random_enable = 0;
-static struct fixed_random fixed_random_seed;
-
-static uint64_t xorshift128p64bit_fixrandom(uint64_t *s0, uint64_t *s1)
-{
-	/*
-	 *  Further scramblings of Marsaglia's xorshift generators
-	 *  Sebastiano Vigna, Universit`a degli Studi di Milano, Italy,
-	 *  arXiv:1404.0390v3 [cs.DS] 23 May 2016.
-	 *  https://arxiv.org/abs/1404.0390
-	 *  http://vigna.di.unimi.it/ftp/papers/xorshiftplus.pdf
-	 *
-	 *  Table I.
-	 *  a23-b17-c26: s34-r30+64-w61 (failures)
-	 *  a23-b18-c5 : s38-r20+70-w65 (weight)
-	 */
-	uint64_t x, y, z;
-
-	x = *s0;
-	y = *s1;
-	z = x + y;
-	*s0 = y;
-	x ^= x << 23/*a*/;
-	*s1 = x ^ y ^ (x >> 18/*b*/) ^ (y >> 5/*c*/);
-
-	return z;
-}
-
-static uint64_t number64_fixrandom(struct fixed_random *state)
-{
-	return xorshift128p64bit_fixrandom(&state->seed.u64[0], &state->seed.u64[1]);
-}
-
-static uint64_t equal64_fixrandom(struct fixed_random *state, uint64_t value)
-{
-	int shift;
-	uint64_t check, result;
-
-	/* shift */
-	if (value == 0ULL)
-		return 0ULL;
-	check = (value >> 1ULL);
-	for (shift = 1; check; shift++)
-		check >>= 1ULL;
-
-	/* generate */
-	check = (64 <= shift)? FIXRANDOM_MASK64BIT: (1ULL << shift) - 1ULL;
-	do {
-		result = check & number64_fixrandom(state);
-	} while (value < result);
-
-	return result;
-}
-
-#ifdef FIXED_WINDOWS
-#include <windows.h>
-#include <ntsecapi.h>
-
-static int call_fixrandom(void *ptr, size_t size)
-{
-	typedef BOOLEAN (WINAPI *apicalltype)(PVOID, ULONG);
-	HMODULE hModule;
-	BOOLEAN result;
-	apicalltype call;
-
-	hModule = LoadLibraryA("Advapi32.dll");
-	if (hModule == NULL) {
-		fprintf(stderr, "LoadLibrary Advapi32 error");
-		return 1;
-	}
-	call = (apicalltype)GetProcAddress(hModule, "SystemFunction036");
-	if (call == NULL) {
-		fprintf(stderr, "GetProcAddress SystemFunction036 error");
-		FreeLibrary(hModule);
-		return 1;
-	}
-	result = (*call)((PVOID)ptr, (ULONG)size);
-	FreeLibrary(hModule);
-
-	return result == FALSE;
-}
-#endif
-
-#ifdef FIXED_UNIX
-static int call_fixrandom(void *ptr, size_t size)
-{
-	FILE *file;
-	size_t check;
-
-	file = fopen("/dev/random", "rb");
-	if (file == NULL) {
-		fprintf(stderr, "fopen /dev/random error.\n");
-		return 1;
-	}
-	check = fread(ptr, 1, size, file);
-	if (check != size) {
-		fprintf(stderr, "fread /dev/random error.\n");
-		return 1;
-	}
-
-	return 0;
-}
-#endif
-
-#ifdef FIXED_DEFAULT
-static int call_fixrandom(void *ptr, size_t size)
-{
-	FILE *file;
-	size_t check;
-
-	file = fopen("/dev/random", "rb");
-	if (file) {
-		check = fread(ptr, 1, size, file);
-		if (check != size) {
-			fprintf(stderr, "fread /dev/random error.\n");
-			return 1;
-		}
-	}
-
-	return 0;
-}
-#endif
-
-static void init_fixrandom(void)
-{
-	if (fixed_random_enable == 0) {
-		if (call_fixrandom(&fixed_random_seed, sizeof(fixed_random_seed))) {
-			fprintf(stderr, "call_fixrandom error.\n");
-			exit(1);
-		}
-		fixed_random_enable = 1;
-	}
-}
-
-static int make_fixrandom(struct fixed_random *ptr)
-{
-	if (fixed_random_enable == 0) {
-		fprintf(stderr, "fixed_random_enable error.\n");
-		return 1;
-	}
-	ptr->seed.u64[0] = number64_fixrandom(&fixed_random_seed);
-	ptr->seed.u64[1] = number64_fixrandom(&fixed_random_seed);
-	return 0;
-}
-
-
-/***********************************************************************
  *  fixnum
  ***********************************************************************/
 /* add */
@@ -596,16 +445,21 @@ int compare_fixptr(fixptr x, fixsize size1, fixptr y, fixsize size2)
 			if (x[i])
 				return 1;
 		}
+		size1 = size2;
 	}
 
 	/* equal */
-	for (i = size1 - 1; ; i--) {
+	if (size1 == 0)
+		return 0;
+	i = size1 - 1;
+	for (;;) {
 		if (x[i] > y[i])
 			return 1;
 		if (x[i] < y[i])
 			return -1;
 		if (i == 0)
 			break;
+		i--;
 	}
 
 	return 0;
@@ -1166,6 +1020,22 @@ fixptr get1_fixed(fixed s, fixsize word1)
 	return check_fixdebug(x);
 }
 
+#include <time.h>
+static unsigned random_seed_fixdebug = 0;
+static uint64_t number64_fixdebug(void)
+{
+	int i;
+	uint64_t v;
+
+	if (random_seed_fixdebug == 0)
+		random_seed_fixdebug = (unsigned)time(NULL);
+	v = 0;
+	for (i = 0; i < sizeof(uint64_t); i++)
+		v |= ((uint64_t)(0xFFU & rand_r(&random_seed_fixdebug))) << (i * 8U);
+
+	return v;
+}
+
 static void push0_fixed(fixed s, fixsize word, fixsize size)
 {
 #ifdef FIXED_64BIT
@@ -1191,10 +1061,10 @@ static void push0_fixed(fixed s, fixsize word, fixsize size)
 	b = x + 1 + 1 + word;
 #endif
 #ifdef FIXED_64BIT
-	*a = *b = (uint64_t)number64_fixrandom(&s->state);
+	*a = *b = (uint64_t)number64_fixdebug();
 	*r = (uint64_t)word;
 #else
-	*a = *b = (uint32_t)number64_fixrandom(&s->state);
+	*a = *b = (uint32_t)number64_fixdebug();
 	*r = (uint32_t)word;
 #endif
 	push_fixrelease(s, size);
@@ -1288,17 +1158,11 @@ fixed make_fixed(fixsize bit1, fixsize size1)
 	s = (struct fixed_struct *)malloc(sizeof(struct fixed_struct));
 	if (s == NULL)
 		return NULL;
+	memset(s, 0, sizeof(struct fixed_struct));
 
 	/* stack */
 	stack = (fixnum *)malloc(sizeof(fixnum) * size);
 	if (stack == NULL) {
-		free(s);
-		return NULL;
-	}
-
-	/* state */
-	if (make_fixrandom(&s->state)) {
-		free(stack);
 		free(s);
 		return NULL;
 	}
@@ -2756,6 +2620,28 @@ int println2_fixed(fixed s, fixsize word1, FILE *file, unsigned radix)
 	return 0;
 }
 
+int println1_fixptr(fixed s, fixptr x, FILE *file, unsigned radix)
+{
+	int check;
+
+	push1ptr_fixed(s, x);
+	check = println1_fixed(s, 0, file, radix);
+	pop1_fixed(s);
+
+	return check;
+}
+
+int println2_fixptr(fixed s, fixptr x, FILE *file, unsigned radix)
+{
+	int check;
+
+	push2ptr_fixed(s, x);
+	check = println2_fixed(s, 1, file, radix);
+	pop2_fixed(s);
+
+	return check;
+}
+
 
 /***********************************************************************
  * binary I/O
@@ -2804,88 +2690,6 @@ void output_fixptr(fixptr x, fixsize word, void *p, size_t size, int little)
 		k = little? i: (size - i - 1);
 		output[k] = u;
 	}
-}
-
-
-/***********************************************************************
- *  random
- ***********************************************************************/
-static fixnum random_number_fixnum(fixed s)
-{
-	return (fixnum)number64_fixrandom(&s->state);
-}
-
-static fixnum random_equal_fixnum(fixed s, fixnum value)
-{
-	return (fixnum)equal64_fixrandom(&s->state, (uint64_t)value);
-}
-
-static int random_loop_fixptr(fixed s, fixptr r, fixsize size)
-{
-	fixsize index, i;
-	fixnum x, y;
-
-	/* r -> 0...r */
-	index = size - 1;
-	x = r[index];
-	y = random_equal_fixnum(s, x);
-	if (x != y)
-		goto tail;
-	for (i = 1; i < size; i++) {
-		index = size - i - 1;
-		x = r[index];
-		y = random_number_fixnum(s);
-		if (x < y)
-			return 1;
-		if (x > y)
-			goto tail;
-	}
-	return 0;
-
-tail:
-	r[index] = y;
-	for (i = 0; i < index; i++)
-		r[i] = random_number_fixnum(s);
-	return 0;
-}
-
-void random_equal_fixptr(fixed s, fixptr x, fixptr r, fixsize size)
-{
-	if (x != r)
-		memcpy_fixptr(r, x, size);
-
-	/* size */
-	size = size_press_fixptr(r, size);
-	if (size == 0) /* all zero */
-		return;
-
-	/* random */
-	while (random_loop_fixptr(s, r, size))
-		continue;
-}
-
-void random_equal_fixed(fixed s)
-{
-	fixptr x, r;
-
-	/* stack: x -> r */
-	x = top1_fixed(s);
-	r = push1get_fixed(s);
-	random_equal_fixptr(s, x, r, s->word1);
-	shift1_fixed(s, 1, 1);
-	check1_fixed(s, 0);
-}
-
-void random_full_fixptr(fixed s, fixptr x, fixsize size)
-{
-	fixsize i;
-	for (i = 0; i < size; i++)
-		x[i] = (fixnum)random_number_fixnum(s);
-}
-
-void random_full_fixed(fixed s)
-{
-	random_full_fixptr(s, push1get_fixed(s), s->word1);
 }
 
 
@@ -3067,14 +2871,5 @@ void xor1_fixed(fixed s)
 	r = get1_fixed(s, 1);
 	xor_fixptr(x, x, r, s->word1);
 	pop1_fixed(s);
-}
-
-
-/*
- *  initialize
- */
-void init_fixed(void)
-{
-	init_fixrandom();
 }
 

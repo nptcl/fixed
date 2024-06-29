@@ -7,14 +7,14 @@ RSA for C
 Debug mode.
 
 ```
-$ cc fixed.c crypt.c main.c
+$ cc *.c
 $ ./a.out
 ```
 
 Release mode.
 
 ```
-$ cc -DFIXED_RELEASE fixed.c crypt.c main.c
+$ cc -DFIXED_RELEASE *.c
 $ ./a.out
 ```
 
