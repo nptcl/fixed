@@ -436,6 +436,69 @@ void println4_fixptr(fixed s, fixptr3 r, FILE *file, unsigned radix)
 
 
 /*
+ *  string-integer
+ */
+static uint8_t string_integer_char_elliptic(char c, int *errorp)
+{
+	if ('0' <= c && c <= '9')
+		return c - '0';
+	if ('a' <= c && c <= 'f')
+		return c - 'a' + 0x0a;
+	if ('A' <= c && c <= 'F')
+		return c - 'A' + 0x0A;
+
+	/* error */
+	*errorp = 1;
+	return 0;
+}
+
+int string_integer_elliptic(const char *x, void *p, int size, int reverse)
+{
+	uint8_t *r, c1, c2;
+	int i, k, u, errorp;
+
+	r = (uint8_t *)p;
+	errorp = 0;
+	for (i = 0; i < size; i++) {
+		k = i * 2;
+		c1 = string_integer_char_elliptic(x[k + 0], &errorp);
+		c2 = string_integer_char_elliptic(x[k + 1], &errorp);
+		u = reverse? (size - i - 1): i;
+		r[u] = (c1 << 4U) | c2;
+	}
+
+	return errorp;
+}
+
+static char integer_string_byte_elliptic(uint8_t c)
+{
+	if (0 <= c && c <= 9)
+		return c + '0';
+	if (0x0A <= c && c <= 0x0F)
+		return c - 0x0A + 'A';
+	/* error */
+	return 0;
+}
+
+void integer_string_elliptic(const void *p, int size, char *x, int reverse)
+{
+	const uint8_t *r;
+	uint8_t v;
+	int i, k, u;
+
+	r = (const uint8_t *)p;
+	for (i = 0; i < size; i++) {
+		k = i * 2;
+		u = reverse? (size - i - 1): i;
+		v = r[u];
+		x[k + 0] = integer_string_byte_elliptic(v >> 4U);
+		x[k + 1] = integer_string_byte_elliptic(v & 0x0F);
+	}
+	x[size * 2] = '\0';
+}
+
+
+/*
  *  make-fixed
  */
 fixed make_secp256k1_fixed(void)

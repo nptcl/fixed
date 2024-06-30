@@ -1,6 +1,6 @@
 VPATH = ..:.
 source = test.c test_fixed.c test_elliptic.c \
-fixed.c sha.c random.c crypt.c elliptic.c addition.c signature.c
+fixed.c sha.c random.c crypt.c elliptic.c addition.c public.c signature.c
 object = $(source:.c=.o)
 a.out = a.out
 #CFLAGS = -g -Wall -DFIXED_DEBUG -DFIXED_8BIT

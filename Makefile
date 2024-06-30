@@ -1,4 +1,5 @@
-source = main.c fixed.c sha.c random.c crypt.c elliptic.c addition.c signature.c
+source = main.c fixed.c sha.c random.c crypt.c \
+elliptic.c addition.c public.c signature.c
 object = $(source:.c=.o)
 a.out = a.out
 #CFLAGS = -g -Wall -DFIXED_DEBUG -DFIXED_8BIT

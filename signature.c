@@ -1,604 +1,364 @@
 #include "addition.h"
-#include "crypt.h"
-#include "elliptic.h"
 #include "fixed.h"
+#include "elliptic.h"
+#include "public.h"
 #include "random.h"
 #include "sha.h"
 #include "signature.h"
 
 /*
- *  inverse
+ *  sign
  */
-void inverse_elliptic(fixed s, fixptr x, fixptr r, fixptr p, fixptr p2)
+static void sign_weierstrass(fixed s,
+		struct fixed_random *state,
+		fixptr private_key, fixptr sign_r, fixptr sign_s,
+		const void *ptr, size_t size,
+		void (*make_public)(fixed, fixptr, fixptr3),
+		fixptr curve_p,
+		fixptr curve_n)
 {
-	power_mod_fixptr(s, x, p2, p, r);
 }
 
-void inverse_secp256k1(fixed s, fixptr x, fixptr r)
+void sign_secp256k1(fixed s, struct fixed_random *state,
+		fixptr private_key, fixptr sign_r, fixptr sign_s,
+		const void *ptr, size_t size)
 {
-	power_mod_fixptr(s, x, Elliptic_secp256k1_p2, Elliptic_secp256k1_p, r);
+	sign_weierstrass(s, state, private_key, sign_r, sign_s, ptr, size,
+			public_secp256k1,
+			Elliptic_secp256k1_p,
+			Elliptic_secp256k1_n);
 }
 
-void inverse_secp256r1(fixed s, fixptr x, fixptr r)
+void sign_secp256r1(fixed s, struct fixed_random *state,
+		fixptr private_key, fixptr sign_r, fixptr sign_s,
+		const void *ptr, size_t size)
 {
-	power_mod_fixptr(s, x, Elliptic_secp256r1_p2, Elliptic_secp256r1_p, r);
+	sign_weierstrass(s, state, private_key, sign_r, sign_s, ptr, size,
+			public_secp256r1,
+			Elliptic_secp256r1_p,
+			Elliptic_secp256r1_n);
 }
 
-void inverse_ed25519(fixed s, fixptr x, fixptr r)
+static void sign_sha_ed25519(fixed s, fixptr r, fixptr x, fixptr y,
+		const void *ptr, size_t size)
 {
-	power_mod_fixptr(s, x, Elliptic_ed25519_p2, Elliptic_ed25519_p, r);
-}
+	uint32_t memory[64];
+	fixptr w;
+	fixsize word1, word2;
+	struct sha64encode sha;
 
-void inverse_ed448(fixed s, fixptr x, fixptr r)
-{
-	power_mod_fixptr(s, x, Elliptic_ed448_p2, Elliptic_ed448_p, r);
-}
-
-
-/*
- *  inverse_n
- */
-void inverse_n_elliptic(fixed s, fixptr x, fixptr r, fixptr p, fixptr p2)
-{
-	power_mod_fixptr(s, x, p2, p, r);
-}
-
-void inverse_n_secp256k1(fixed s, fixptr x, fixptr r)
-{
-	power_mod_fixptr(s, x, Elliptic_secp256k1_n2, Elliptic_secp256k1_n, r);
-}
-
-void inverse_n_secp256r1(fixed s, fixptr x, fixptr r)
-{
-	power_mod_fixptr(s, x, Elliptic_secp256r1_n2, Elliptic_secp256r1_n, r);
-}
-
-void inverse_n_ed25519(fixed s, fixptr x, fixptr r)
-{
-	power_mod_fixptr(s, x, Elliptic_ed25519_n2, Elliptic_ed25519_n, r);
-}
-
-void inverse_n_ed448(fixed s, fixptr x, fixptr r)
-{
-	power_mod_fixptr(s, x, Elliptic_ed448_n2, Elliptic_ed448_n, r);
-}
-
-
-/*
- *  affine
- */
-static void affine_elliptic(fixed s, fixptr *v,
-		fixptr rx, fixptr ry, fixptr p, fixptr p2)
-{
-	fixptr w, z;
-
+	word1 = s->word1;
+	word2 = s->word2;
+	init_sha512encode(&sha);
+	/* x */
+	output_fixptr(x, word1, memory, 32, 1);
+	read_sha512encode(&sha, memory, 32);
+	/* y */
+	output_fixptr(y, word1, memory, 32, 1);
+	read_sha512encode(&sha, memory, 32);
+	/* ptr */
+	read_sha512encode(&sha, ptr, size);
+	/* result */
+	calc_sha512encode(&sha, memory);
 	w = push2get_fixed(s);
-	z = push1get_fixed(s);
-
-	/* 1/z */
-	inverse_elliptic(s, v[2], z, p, p2);
-
-	/* x/z */
-	mul_fixptr(v[0], z, s->word1, w, s->word2);
-	rem2_elliptic_curve(s, w, rx, p);
-
-	/* y/z */
-	mul_fixptr(v[1], z, s->word1, w, s->word2);
-	rem2_elliptic_curve(s, w, ry, p);
-
-	pop1_fixed(s);
+	input_fixptr(w, word2, memory, 64, 1);
+	rem_fixptr(s, w, Elliptic_ed25519_n, r);
 	pop2_fixed(s);
 }
 
-void affine_secp256k1(fixed s, fixptr3 v, fixptr rx, fixptr ry)
+void sign_ed25519(fixed s,
+		fixptr private_key, fixptr sign_r, fixptr sign_s,
+		const void *ptr, size_t size)
 {
-	affine_elliptic(s, v, rx, ry, Elliptic_secp256k1_p, Elliptic_secp256k1_p2);
-}
-
-void affine_secp256r1(fixed s, fixptr3 v, fixptr rx, fixptr ry)
-{
-	affine_elliptic(s, v, rx, ry, Elliptic_secp256r1_p, Elliptic_secp256r1_p2);
-}
-
-void affine_ed25519(fixed s, fixptr4 v, fixptr rx, fixptr ry)
-{
-	affine_elliptic(s, v, rx, ry, Elliptic_ed25519_p, Elliptic_ed25519_p2);
-}
-
-void affine_ed448(fixed s, fixptr3 v, fixptr rx, fixptr ry)
-{
-	affine_elliptic(s, v, rx, ry, Elliptic_ed448_p, Elliptic_ed448_p2);
-}
-
-
-/*
- *  equal_point
- */
-int equal_point_elliptic(fixed s, fixptr *p, fixptr *q, fixptr curve_p)
-{
-	int check;
-	fixptr w2, x, y;
+	vector2_ed25519 encode;
+	fixptr w2, u, v, a, w, k;
+	fixptr4 z;
 	fixsize word1, word2;
 
 	word1 = s->word1;
 	word2 = s->word2;
 	w2 = push2get_fixed(s);
-	x = push1get_fixed(s);
-	y = push1get_fixed(s);
+	u = push1get_fixed(s);
+	v = push1get_fixed(s);
+	a = push1get_fixed(s);
+	w = push1get_fixed(s);
+	k = push1get_fixed(s);
+	push4_fixed(s, z);
 
-	/* check1 */
-	mul_fixptr(p[0], q[2], word1, w2, word2);
-	rem2_elliptic_curve(s, w2, x, curve_p);
-	mul_fixptr(q[0], p[2], word1, w2, word2);
-	rem2_elliptic_curve(s, w2, y, curve_p);
-	sub_elliptic_curve(x, y, x, curve_p, word1);
-	if (! zerop_fixptr(x, word1)) {
-		check = 0;
-		goto finish;
-	}
+	/* u, v */
+	public_sign_ed25519(s, private_key, u, v);
+	/* a */
+	multiple_ed25519(s, u, Elliptic_ed25519_g, z);
+	encode_ed25519(s, z, encode);
+	input_fixptr(a, word1, encode, vector2_size_ed25519, 1);
+	/* w */
+	sign_sha_ed25519(s, w, v, NULL, ptr, size);
+	/* r */
+	multiple_ed25519(s, w, Elliptic_ed25519_g, z);
+	encode_ed25519(s, z, encode);
+	input_fixptr(sign_r, word1, encode, vector2_size_ed25519, 1);
+	/* k */
+	sign_sha_ed25519(s, k, sign_r, a, ptr, size);
+	/* s */
+	mul_fixptr(k, u, word1, w2, word2);
+	rem2_elliptic_ed25519(s, w2, k);
+	add_elliptic_ed25519(w, k, sign_s, word1);
 
-	/* check2 */
-	mul_fixptr(p[1], q[2], word1, w2, word2);
-	rem2_elliptic_curve(s, w2, x, curve_p);
-	mul_fixptr(q[1], p[2], word1, w2, word2);
-	rem2_elliptic_curve(s, w2, y, curve_p);
-	sub_elliptic_curve(x, y, y, curve_p, word1);
-	if (! zerop_fixptr(y, word1)) {
-		check = 0;
-		goto finish;
-	}
-
-	/* equal */
-	check = 1;
-
-finish:
-	pop1n_fixed(s, 2);
-	pop2_fixed(s);
-
-	return check;
-}
-
-int equal_point_secp256k1(fixed s, fixptr3 p, fixptr3 q)
-{
-	return equal_point_elliptic(s, p, q, (fixptr)Elliptic_secp256k1_p);
-}
-
-int equal_point_secp256r1(fixed s, fixptr3 p, fixptr3 q)
-{
-	return equal_point_elliptic(s, p, q, (fixptr)Elliptic_secp256r1_p);
-}
-
-int equal_point_ed25519(fixed s, fixptr4 p, fixptr4 q)
-{
-	return equal_point_elliptic(s, p, q, (fixptr)Elliptic_ed25519_p);
-}
-
-int equal_point_ed448(fixed s, fixptr3 p, fixptr3 q)
-{
-	return equal_point_elliptic(s, p, q, (fixptr)Elliptic_ed448_p);
-}
-
-
-/*
- *  valid
- */
-static int valid_weierstrass_elliptic(fixed s, fixptr x0, fixptr y0,
-		fixptr curve_a, fixptr curve_b, fixptr curve_p)
-{
-	int compare;
-	fixptr x, y, z, w;
-	fixsize word1, word2;
-
-	word1 = s->word1;
-	word2 = s->word2;
-	w = push2get_fixed(s);
-	x = push1get_fixed(s);
-	y = push1get_fixed(s);
-	z = push1get_fixed(s);
-
-	/* y*y */
-	mul_square_fixptr(y0, word1, w, word2);
-	rem2_elliptic_curve(s, w, y, curve_p);
-
-	/* x*x*x */
-	mul_square_fixptr(x0, word1, w, word2);
-	rem2_elliptic_curve(s, w, x, curve_p);
-	mul_fixptr(x, x0, word1, w, word2);
-	rem2_elliptic_curve(s, w, x, curve_p);
-
-	/* a*x */
-	mul_fixptr(curve_a, x0, word1, w, word2);
-	rem2_elliptic_curve(s, w, z, curve_p);
-
-	/* + */
-	add_elliptic_curve(x, z, x, curve_p, word1);
-	add_elliptic_curve(x, curve_b, x, curve_p, word1);
-
-	/* compare */
-	compare = compare_fixptr(x, word1, y, word1);
-
-	/* pop */
-	pop1n_fixed(s, 3);
-	pop2_fixed(s);
-
-	return compare == 0;
-}
-
-int valid_secp256k1(fixed s, fixptr3 r)
-{
-	int check;
-	fixptr x, y;
-
-	x = push1get_fixed(s);
-	y = push1get_fixed(s);
-	affine_secp256k1(s, r, x, y);
-	check = valid_weierstrass_elliptic(s, x, y,
-			Elliptic_secp256k1_a,
-			Elliptic_secp256k1_b,
-			Elliptic_secp256k1_p);
-	pop1n_fixed(s, 2);
-
-	return check;
-}
-
-int valid_secp256r1(fixed s, fixptr3 r)
-{
-	int check;
-	fixptr x, y;
-
-	x = push1get_fixed(s);
-	y = push1get_fixed(s);
-	affine_secp256r1(s, r, x, y);
-	check = valid_weierstrass_elliptic(s, x, y,
-			Elliptic_secp256r1_a,
-			Elliptic_secp256r1_b,
-			Elliptic_secp256r1_p);
-	pop1n_fixed(s, 2);
-
-	return check;
-}
-
-static int valid_edwards_elliptic(fixed s, fixptr x0, fixptr y0,
-		fixptr curve_a, fixptr curve_d, fixptr curve_p)
-{
-	int compare;
-	fixptr x, y, xy, w;
-	fixsize word1, word2;
-	fixnum ignore;
-
-	word1 = s->word1;
-	word2 = s->word2;
-	w = push2get_fixed(s);
-	x = push1get_fixed(s);
-	y = push1get_fixed(s);
-	xy = push1get_fixed(s);
-
-	/* x <- x*x */
-	mul_square_fixptr(x0, word1, w, word2);
-	rem2_elliptic_curve(s, w, x, curve_p);
-
-	/* y <- y*y */
-	mul_square_fixptr(y0, word1, w, word2);
-	rem2_elliptic_curve(s, w, y, curve_p);
-
-	/* xy <- x*y */
-	mul_fixptr(x, y, word1, w, word2);
-	rem2_elliptic_curve(s, w, xy, curve_p);
-
-	/* x <- a*x */
-	mul_fixptr(curve_a, x, word1, w, word2);
-	rem2_elliptic_curve(s, w, x, curve_p);
-
-	/* x <- x + y */
-	add_elliptic_curve(x, y, x, curve_p, word1);
-
-	/* y <- d*xy */
-	mul_fixptr(curve_d, xy, word1, w, word2);
-	rem2_elliptic_curve(s, w, y, curve_p);
-
-	/* y <- 1 + y */
-	addv_fixptr(y, s->word1, 1, &ignore);
-	rem1_elliptic_curve(y, curve_p, word1);
-
-	/* compare */
-	compare = compare_fixptr(x, word1, y, word1);
-
-	/* pop */
-	pop1n_fixed(s, 3);
-	pop2_fixed(s);
-
-	return compare == 0;
-}
-
-static int valid_edwards_ed25519(fixed s, fixptr4 r)
-{
-	int check;
-	fixptr x, y;
-
-	x = push1get_fixed(s);
-	y = push1get_fixed(s);
-	affine_ed25519(s, r, x, y);
-	check = valid_edwards_elliptic(s, x, y,
-			Elliptic_ed25519_a,
-			Elliptic_ed25519_d,
-			Elliptic_ed25519_p);
-	pop1n_fixed(s, 2);
-
-	return check;
-}
-
-static int valid_point4_ed25519(fixed s, fixptr4 r)
-{
-	int compare;
-	fixptr x, y, z, t, xy, w2;
-	fixsize word1, word2;
-
-	word1 = s->word1;
-	word2 = s->word2;
-	w2 = push2get_fixed(s);
-	x = push1get_fixed(s);
-	y = push1get_fixed(s);
-	z = push1get_fixed(s);
-	t = push1get_fixed(s);
-	xy = push1get_fixed(s);
-
-	inverse_ed25519(s, r[2], z);
-	mul_fixptr(r[0], z, word1, w2, word2);
-	rem2_elliptic_ed25519(s, w2, x);
-	mul_fixptr(r[1], z, word1, w2, word2);
-	rem2_elliptic_ed25519(s, w2, y);
-	mul_fixptr(r[3], z, word1, w2, word2);
-	rem2_elliptic_ed25519(s, w2, t);
-	mul_fixptr(x, y, word1, w2, word2);
-	rem2_elliptic_ed25519(s, w2, xy);
-	compare = compare_fixptr(xy, word1, t, word1);
-
+	pop3_fixed(s);
 	pop1n_fixed(s, 5);
 	pop2_fixed(s);
-
-	return compare == 0;
 }
 
-int valid_ed25519(fixed s, fixptr4 r)
+
+/*
+ *  verify
+ */
+int verify_secp256k1(fixed s,
+		fixptr3 public_key, fixptr sign_r, fixptr sign_s,
+		const void *ptr, size_t size)
 {
-	return valid_point4_ed25519(s, r)
-		&& valid_edwards_ed25519(s, r);
+	return 0;
 }
 
-int valid_ed448(fixed s, fixptr3 r)
+int verify_secp256r1(fixed s,
+		fixptr3 public_key, fixptr sign_r, fixptr sign_s,
+		const void *ptr, size_t size)
+{
+	return 0;
+}
+
+int verify_ed25519(fixed s, fixptr4 public_key,
+		fixptr sign_r, fixptr sign_s,
+		const void *ptr, size_t size)
+{
+	return 0;
+}
+
+int verify_ed448(fixed s,
+		fixptr3 public_key, fixptr sign_r, fixptr sign_s,
+		const void *ptr, size_t size)
+{
+	return 0;
+}
+
+
+/*
+ *  verify_string
+ */
+int verify_string_secp256k1(fixed s,
+		const char *public_key, const char *sign_r, const char *sign_s,
+		const void *ptr, size_t size)
 {
 	int check;
-	fixptr x, y;
+	fixptr3 p3;
+	fixptr r1, s1;
+	vector2_secp256k1 v1;
+	vector1_secp256k1 v2;
+	vector1_secp256k1 v3;
 
-	x = push1get_fixed(s);
-	y = push1get_fixed(s);
-	affine_ed448(s, r, x, y);
-	check = valid_edwards_elliptic(s, x, y,
-			Elliptic_ed448_a,
-			Elliptic_ed448_d,
-			Elliptic_ed448_p);
-	pop1n_fixed(s, 2);
+	/* parse */
+	if (string_integer_elliptic(public_key, v1, vector2_size_secp256k1, 0))
+		return 0;
+	if (string_integer_elliptic(sign_r, v2, vector1_size_secp256k1, 0))
+		return 0;
+	if (string_integer_elliptic(sign_s, v3, vector1_size_secp256k1, 0))
+		return 0;
 
-	return check;
-}
+	/* push */
+	r1 = push1get_fixed(s);
+	s1 = push1get_fixed(s);
+	push3_fixed(s, p3);
 
+	/* verify */
+	if (decode_secp256k1(s, v1, p3)) {
+		check = 0;
+		goto finish;
+	}
+	input_fixptr(s1, s->word1, v2, vector1_size_secp256k1, 0);
+	input_fixptr(r1, s->word1, v3, vector1_size_secp256k1, 0);
+	check = verify_secp256k1(s, p3, r1, s1, ptr, size);
 
-/*
- *  neutral
- */
-int neutral_secp256k1(fixed s, fixptr3 r)
-{
-	return zerop_fixptr(r[2], s->word1);
-}
-
-int neutral_secp256r1(fixed s, fixptr3 r)
-{
-	return zerop_fixptr(r[2], s->word1);
-}
-
-int neutral_ed25519(fixed s, fixptr4 r)
-{
-	int check;
-	fixptr x, y;
-
-	x = push1get_fixed(s);
-	y = push1get_fixed(s);
-	affine_ed25519(s, r, x, y);
-	check = zerop_fixptr(x, s->word1)
-		&& (compare_fixnum_fixptr(y, s->word1, 1) == 0);
-	pop1n_fixed(s, 2);
-
-	return check;
-}
-
-int neutral_ed448(fixed s, fixptr3 r)
-{
-	int check;
-	fixptr x, y;
-
-	x = push1get_fixed(s);
-	y = push1get_fixed(s);
-	affine_ed448(s, r, x, y);
-	check = zerop_fixptr(x, s->word1)
-		&& (compare_fixnum_fixptr(y, s->word1, 1) == 0);
-	pop1n_fixed(s, 2);
-
-	return check;
-}
-
-
-/*
- *  make private key
- */
-void private_secp256k1(fixed s, struct fixed_random *state, fixptr r)
-{
-	do {
-		random_less_fixptr(state, Elliptic_secp256k1_n, r, s->word1);
-	} while (zerop_fixptr(r, s->word1));
-}
-
-void private_secp256r1(fixed s, struct fixed_random *state, fixptr r)
-{
-	do {
-		random_less_fixptr(state, Elliptic_secp256r1_n, r, s->word1);
-	} while (zerop_fixptr(r, s->word1));
-}
-
-void private_ed25519(fixed s, struct fixed_random *state, fixptr r)
-{
-	random_full_fixptr(state, r, s->word1);
-}
-
-void private_ed448(fixed s, struct fixed_random *state, fixptr r)
-{
-	random_full_fixptr(state, r, s->word1);
-}
-
-
-/*
- *  make public key
- */
-void public_secp256k1(fixed s, fixptr private_key, fixptr3 r)
-{
-	multiple_secp256k1(s, private_key, Elliptic_secp256k1_g, r);
-}
-
-void public_secp256r1(fixed s, fixptr private_key, fixptr3 r)
-{
-	multiple_secp256r1(s, private_key, Elliptic_secp256r1_g, r);
-}
-
-static void public_sign_ed25519(fixed s, fixptr private_key, fixptr4 r, fixptr sign)
-{
-	uint8_t x[BYTE_SHA512ENCODE];
-	struct sha64encode sha;
-	fixptr a;
-	fixsize word1;
-
-	/* SHA-512 */
-	word1 = s->word1;
-	output_fixptr(private_key, word1, x, elliptic_ed25519_byte, 1);
-	init_sha512encode(&sha);
-	read_sha512encode(&sha, x, elliptic_ed25519_byte);
-	calc_sha512encode(&sha, x);
-
-	/* x */
-	x[0] &= 0xF8;
-	x[32 - 1] &= 0x7F;
-	x[32 - 1] |= 0x40;
-
-	/* r */
-	a = push1get_fixed(s);
-	input_fixptr(a, word1, x, elliptic_ed25519_byte, 1);
-	multiple_ed25519(s, a, Elliptic_ed25519_g, r);
-	pop1_fixed(s);
-
-	/* sign */
-	if (sign)
-		input_fixptr(sign, word1, x + 32, elliptic_ed25519_byte, 1);
-}
-
-void public_ed25519(fixed s, fixptr private_key, fixptr4 r)
-{
-	public_sign_ed25519(s, private_key, r, NULL);
-}
-
-static void public_sign_ed448(fixed s, fixptr private_key, fixptr3 r, fixptr sign)
-{
-	/*
-	 *  ed448 -> 57byte
-	 *  fixed -> 64byte
-	 */
-	uint8_t x[57*2];
-	struct sha3encode sha;
-	fixptr a;
-	fixsize word1;
-
-	/* Hash SHAKE-256 */
-	word1 = s->word1;
-	output_fixptr(private_key, word1, x, 57, 1);
-	init_shake_256_encode(&sha);
-	read_sha3encode(&sha, x, 57);
-	result_sha3encode(&sha, x, 57*2);
-
-	/* a */
-	x[0] &= 0xFC;
-	x[57 - 1] = 0;
-	x[57 - 2] |= 0x80;
-
-	/* r */
-	a = push1get_fixed(s);
-	input_fixptr(a, word1, x, 57, 1);
-	multiple_ed448(s, a, Elliptic_ed448_g, r);
-	pop1_fixed(s);
-
-	/* sign */
-	if (sign)
-		input_fixptr(sign, word1, x + 57, 57, 1);
-}
-
-void public_ed448(fixed s, fixptr private_key, fixptr3 r)
-{
-	public_sign_ed448(s, private_key, r, NULL);
-}
-
-
-/*
- *  encode
- */
-int encode_secp256k1(fixed s, fixptr3 v, vector2_secp256k1 r, int compress);
-int encode_secp256r1(fixed s, fixptr3 v, vector2_secp256r1 r, int compress);
-
-int encode_ed25519(fixed s, fixptr4 v, vector2_ed25519 r)
-{
-	fixptr x, y;
-	fixsize word1;
-
-	word1 = s->word1;
-	x = push1get_fixed(s);
-	y = push1get_fixed(s);
-
-	/* encode */
-	affine_ed25519(s, v, x, y);
-	if (x[0] & 0x01)
-		setbit_fixptr(y, word1, 1, 255);
-	output_fixptr(x, word1, r, vector2_size_ed25519, 1);
-
-	/* pop */
-	pop2_fixed(s);
+finish:
+	pop3_fixed(s);
 	pop1n_fixed(s, 3);
-
-	return vector2_size_ed25519;
+	return check;
 }
 
-int encode_ed448(fixed s, fixptr3 v, vector2_ed448 r)
+int verify_string_secp256r1(fixed s,
+		const char *public_key, const char *sign_r, const char *sign_s,
+		const void *ptr, size_t size)
 {
-	fixptr x, y;
-	fixsize word1;
+	int check;
+	fixptr3 p3;
+	fixptr r1, s1;
+	vector2_secp256r1 v1;
+	vector1_secp256r1 v2;
+	vector1_secp256r1 v3;
 
-	word1 = s->word1;
-	x = push1get_fixed(s);
-	y = push1get_fixed(s);
+	/* parse */
+	if (string_integer_elliptic(public_key, v1, vector2_size_secp256r1, 0))
+		return 0;
+	if (string_integer_elliptic(sign_r, v2, vector1_size_secp256r1, 0))
+		return 0;
+	if (string_integer_elliptic(sign_s, v3, vector1_size_secp256r1, 0))
+		return 0;
 
-	/* encode */
-	affine_ed448(s, v, x, y);
-	if (x[0] & 0x01)
-		setbit_fixptr(y, word1, 1, 455);
-	output_fixptr(x, word1, r, vector2_size_ed448, 1);
+	/* push */
+	r1 = push1get_fixed(s);
+	s1 = push1get_fixed(s);
+	push3_fixed(s, p3);
 
-	/* pop */
-	pop2_fixed(s);
+	/* verify */
+	if (decode_secp256r1(s, v1, p3)) {
+		check = 0;
+		goto finish;
+	}
+	input_fixptr(s1, s->word1, v2, vector1_size_secp256r1, 0);
+	input_fixptr(r1, s->word1, v3, vector1_size_secp256r1, 0);
+	check = verify_secp256r1(s, p3, r1, s1, ptr, size);
+
+finish:
+	pop3_fixed(s);
 	pop1n_fixed(s, 3);
+	return check;
+}
 
-	return vector2_size_ed448;
+int verify_string_ed25519(fixed s,
+		const char *public_key, const char *sign_r, const char *sign_s,
+		const void *ptr, size_t size)
+{
+	int check;
+	fixptr4 p4;
+	fixptr r1, s1;
+	vector2_ed25519 v1;
+	vector1_ed25519 v2;
+	vector1_ed25519 v3;
+
+	/* parse */
+	if (string_integer_elliptic(public_key, v1, vector2_size_ed25519, 0))
+		return 0;
+	if (string_integer_elliptic(sign_r, v2, vector1_size_ed25519, 0))
+		return 0;
+	if (string_integer_elliptic(sign_s, v3, vector1_size_ed25519, 0))
+		return 0;
+
+	/* push */
+	r1 = push1get_fixed(s);
+	s1 = push1get_fixed(s);
+	push4_fixed(s, p4);
+
+	/* verify */
+	if (decode_ed25519(s, v1, p4)) {
+		check = 0;
+		goto finish;
+	}
+	input_fixptr(s1, s->word1, v2, vector1_size_ed25519, 0);
+	input_fixptr(r1, s->word1, v3, vector1_size_ed25519, 0);
+	check = verify_ed25519(s, p4, r1, s1, ptr, size);
+
+finish:
+	pop4_fixed(s);
+	pop1n_fixed(s, 3);
+	return check;
+}
+
+int verify_string_ed448(fixed s,
+		const char *public_key, const char *sign_r, const char *sign_s,
+		const void *ptr, size_t size)
+{
+	int check;
+	fixptr3 p3;
+	fixptr r1, s1;
+	vector2_ed448 v1;
+	vector1_ed448 v2;
+	vector1_ed448 v3;
+
+	/* parse */
+	if (string_integer_elliptic(public_key, v1, vector2_size_ed448, 0))
+		return 0;
+	if (string_integer_elliptic(sign_r, v2, vector1_size_ed448, 0))
+		return 0;
+	if (string_integer_elliptic(sign_s, v3, vector1_size_ed448, 0))
+		return 0;
+
+	/* push */
+	r1 = push1get_fixed(s);
+	s1 = push1get_fixed(s);
+	push3_fixed(s, p3);
+
+	/* verify */
+	if (decode_ed448(s, v1, p3)) {
+		check = 0;
+		goto finish;
+	}
+	input_fixptr(s1, s->word1, v2, vector1_size_ed448, 0);
+	input_fixptr(r1, s->word1, v3, vector1_size_ed448, 0);
+	check = verify_ed448(s, p3, r1, s1, ptr, size);
+
+finish:
+	pop3_fixed(s);
+	pop1n_fixed(s, 3);
+	return check;
 }
 
 
 /*
- *  decode
+ *  others
  */
-void decode_secp256k1(fixed s, vector2_secp256k1 v, fixptr3 r);
-void decode_secp256r1(fixed s, vector2_secp256r1 v, fixptr3 r);
-void decode_ed25519(fixed s, vector2_ed25519 v, fixptr4 r);
-void decode_ed448(fixed s, vector2_ed448 v, fixptr3 r);
+#include <stdio.h>
+
+void genkey_elliptic(void)
+{
+}
+
+int main_verify_elliptic(void)
+{
+	int verify;
+	fixed s;
+
+	/* secp256k1 */
+	s = make_secp256k1_fixed();
+	verify = verify_string_secp256k1(s,
+			"03FEEF09658067CFBE3BE8685DDCE8E9C03B4A397ADC4A0255CE0B29FC63BCDC9C",
+			"7C7EDD22B0AED24D1B4A3826E228CE52EC897D52826D5912459238FC36008B86",
+			"38C86C613A977CD5D1E024380FB56CDB924B0D972E903AB740F4E7F3A90F62BC",
+			"Hello", 5);
+	printf("secp256k1.verify = %d\n", verify);
+	free_fixed(s);
+
+	/* secp256r1 */
+	s = make_secp256r1_fixed();
+	verify = verify_string_secp256r1(s,
+			"03CD92CF7B1C9CE9858383806B8540D72FB022BE577E21DE02B8EAA27371DB7AF2",
+			"FF6331919D62BFF9236113998250AB9079AA81C83085A27CC38A2CC0EEDDD98D",
+			"1A374ADE37A61F6014C29C723C425BB3E6B519D517E16F66A46869F8EC535F89",
+			"Hello", 5);
+	printf("secp256r1.verify = %d\n", verify);
+	free_fixed(s);
+
+	/* ed25519 */
+	s = make_ed25519_fixed();
+	verify = verify_string_ed25519(s,
+			"75AB16F53A060E7AF9A4B8ECEA3D4DEF058AED2C626FEC96D5505C4A7D922960",
+			"285D61D0DAC982F09365DA699DFD10A7B1B3A4D29A8468655A71F49965D4CEE1",
+			"A58118E7ECAE263034F4BA7EB57BEE8D639C9BAF5BDE6BE97F2F864B3A1A7606",
+			"Hello", 5);
+	printf("ed25519.verify = %d\n", verify);
+	free_fixed(s);
+
+	/* ed448 */
+	s = make_ed448_fixed();
+	verify = verify_string_ed448(s,
+			"99AFC3768EE41B96F208EBAF8627908690DC6A5AC64659F93D0A46C20"
+			"92B61E84AD14DD03F7B3F146799C29F65682126D517B7E1EA57716E00",
+			"DC38653AAD2F456132602EBC47571DABB56C36BA35D6965F820AFFB0F"
+			"BE478439C7CF1D9EE7033792A23E80811CFAB07DC2B71DDEF526F6700",
+			"0E11296ECFACEA4E5E9B795AC4048D711636BE468A99639F953ED1E94"
+			"8A6351F51DE0AE167EB268012E9712F7D6ADD97E80BB36E291C2A2D00",
+			"Hello", 5);
+	printf("ed25519.verify = %d\n", verify);
+	free_fixed(s);
+
+	return 0;
+}
 

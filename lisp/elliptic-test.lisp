@@ -430,6 +430,7 @@
 ;;  G  (x0=0)
 ;;    216936D3CD6E53FEC0A4E231FDD6DC5C692CC7609525A7B2C9562D608F25D51A
 ;;    6666666666666666666666666666666666666666666666666666666666666658
+
 ;;  5G  (x0=1)
 ;;    49FDA73EADE3587BFCEF7CF7D12DA5DE5C2819F93E1BE1A591409CC0322EF233
 ;;    5F4825B298FEAE6FE02C6E148992466631282ECA89430B5D10D21F83D676C8ED
@@ -480,7 +481,8 @@
     (let* ((g *elliptic-g*)
            (x (encode g t))
            (y (decode x)))
-      (equal-point g y)))
+      (and (equal-point g y)
+           (valid y))))
   t)
 
 (deftest decode-secp256k1.2
@@ -488,7 +490,8 @@
     (let* ((g *elliptic-g*)
            (x (encode g nil))
            (y (decode x)))
-      (equal-point g y)))
+      (and (equal-point g y)
+           (valid y))))
   t)
 
 (deftest decode-secp256k1.3
@@ -510,7 +513,8 @@
     (let* ((g *elliptic-g*)
            (x (encode g t))
            (y (decode x)))
-      (equal-point g y)))
+      (and (equal-point g y)
+           (valid y))))
   t)
 
 (deftest decode-secp256r1.2
@@ -518,7 +522,8 @@
     (let* ((g *elliptic-g*)
            (x (encode g nil))
            (y (decode x)))
-      (equal-point g y)))
+      (and (equal-point g y)
+           (valid y))))
   t)
 
 (deftest decode-secp256r1.3
@@ -547,7 +552,8 @@
     (let* ((g *elliptic-g*)
            (x (encode g))
            (y (decode x)))
-      (equal-point g y)))
+      (and (equal-point g y)
+           (valid y))))
   t)
 
 (deftest decode-ed25519.3
@@ -555,7 +561,8 @@
     (let* ((g (multiple 5 *elliptic-g*))  ;; 5G
            (x (encode g))
            (y (decode x)))
-      (equal-point g y)))
+      (and (equal-point g y)
+           (valid y))))
   t)
 
 (deftest decode-ed448.1
@@ -570,7 +577,8 @@
     (let* ((g *elliptic-g*)
            (x (encode g))
            (y (decode x)))
-      (equal-point g y)))
+      (and (equal-point g y)
+           (valid y))))
   t)
 
 (deftest decode-ed448.3
@@ -578,7 +586,8 @@
     (let* ((g (multiple 2 *elliptic-g*))  ;; 2G
            (x (encode g))
            (y (decode x)))
-      (equal-point g y)))
+      (and (equal-point g y)
+           (valid y))))
   t)
 
 

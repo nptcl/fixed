@@ -106,6 +106,8 @@ void setbit_fixptr(fixptr x, fixsize word, int on, unsigned i);
 
 void println3_fixptr(fixed s, fixptr3 r, FILE *file, unsigned radix);
 void println4_fixptr(fixed s, fixptr3 r, FILE *file, unsigned radix);
+int string_integer_elliptic(const char *x, void *p, int size, int reverse);
+void integer_string_elliptic(const void *p, int size, char *x, int reverse);
 
 /* make */
 fixed make_secp256k1_fixed(void);
