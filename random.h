@@ -36,6 +36,7 @@
 #define FIXED_DEFAULT
 #endif
 
+#include <stddef.h>
 #include <stdint.h>
 
 struct fixed_random {
@@ -50,6 +51,7 @@ uint64_t equal64_fixrandom(struct fixed_random *state, uint64_t value);
 uint64_t number64_sha_fixrandom(struct fixed_random *state);
 uint64_t equal64_sha_fixrandom(struct fixed_random *state, uint64_t value);
 
+void init_seed_fixrandom(const void *ptr, size_t size);
 void init_fixrandom(void);
 int make_fixrandom(struct fixed_random *ptr);
 

@@ -1860,21 +1860,21 @@ static void divrem_fixed(fixed s)
 	}
 }
 
-static void div_copy_fixed(fixed s, fixptr q2, fixptr r1)
+static void div_copy_fixed(fixed s, fixptr q2, fixsize word2, fixptr r1, fixsize word1)
 {
 	fixsize diff;
 
 	/* copy q2 */
 	s->sizeq = size_press_fixptr(s->q, s->sizeq);
 	memcpy_fixptr(q2, s->q, s->sizeq);
-	diff = s->word2 - s->sizeq;
+	diff = word2 - s->sizeq;
 	if (diff)
 		memzero_fixptr(q2 + s->sizeq, diff);
 
 	/* copy r1 */
 	s->sizer = size_press_fixptr(s->r, s->sizer);
 	memcpy_fixptr(r1, s->r, s->sizer);
-	diff = s->word1 - s->sizer;
+	diff = word1 - s->sizer;
 	if (diff)
 		memzero_fixptr(r1 + s->sizer, diff);
 }
@@ -1931,7 +1931,8 @@ static fixptr div_push_fixed(fixed s, fixsize size)
 static void div_shift_fixed(fixed s,
 		fixptr x2, fixsize sizex,
 		fixptr y1, fixsize sizey,
-		fixptr q2, fixptr r1)
+		fixptr q2, fixsize word2,
+		fixptr r1, fixsize word1)
 {
 	int shift, nshift;
 	fixnum carry;
@@ -1979,7 +1980,7 @@ static void div_shift_fixed(fixed s,
 	}
 
 	/* result */
-	div_copy_fixed(s, q2, r1);
+	div_copy_fixed(s, q2, word2, r1, word1);
 	roll_fixed(s, rollback);
 }
 
@@ -2081,15 +2082,16 @@ static void div_single_fixed(
 	*rem = carry;
 }
 
-void div_fixptr(fixed s, fixptr x2, fixptr y1, fixptr q2, fixptr r1)
+static void div_size_fixptr(fixed s,
+		fixptr x2, fixptr y1,
+		fixptr q2, fixptr r1,
+		fixsize word2, fixsize word1)
 {
 	int checkx, checky, diff;
 	fixnum a2, b1;
-	fixsize word1, word2, wordx, wordy;
+	fixsize wordx, wordy;
 
 	/* stack: x2 x1 y0 -> q2 q1 r0 */
-	word1 = s->word1;
-	word2 = s->word2;
 	wordx = size_press_fixptr(x2, word2);
 	wordy = size_press_fixptr(y1, word1);
 
@@ -2147,7 +2149,26 @@ void div_fixptr(fixed s, fixptr x2, fixptr y1, fixptr q2, fixptr r1)
 	}
 
 	/* x/y and x>y, q...r */
-	div_shift_fixed(s, x2, wordx, y1, wordy, q2, r1);
+	div_shift_fixed(s, x2, wordx, y1, wordy, q2, word2, r1, word1);
+}
+
+void div1_fixptr(fixed s, fixptr x1, fixptr y1, fixptr q1, fixptr r1)
+{
+	div_size_fixptr(s, x1, y1, q1, r1, s->word1, s->word1);
+}
+
+void rem1_fixptr(fixed s, fixptr x1, fixptr y1, fixptr r1)
+{
+	fixptr q1;
+
+	q1 = push1get_fixed(s);
+	div1_fixptr(s, x1, y1, q1, r1);
+	pop1_fixed(s);
+}
+
+void div_fixptr(fixed s, fixptr x2, fixptr y1, fixptr q2, fixptr r1)
+{
+	div_size_fixptr(s, x2, y1, q2, r1, s->word2, s->word1);
 }
 
 void rem_fixptr(fixed s, fixptr x2, fixptr y1, fixptr r1)

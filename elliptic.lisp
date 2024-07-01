@@ -792,25 +792,25 @@
 
 ;;  ed25519
 (defun verify-ed25519 (public message r s)
-  (let ((a (encode public))
-        (p (decode r)))
-    (cond ((or (null p)) (values nil :error))
-          ((<= *elliptic-n* s) nil)
-          (t (let* ((k (sign-sha-ed25519 r a message))
-                    (x (multiple s *elliptic-g*))
-                    (y (addition p (multiple k public))))
-               (equal-point x y))))))
+  (when (< s *elliptic-n*)
+    (let ((a (encode public))
+          (p (decode r)))
+      (when p
+        (let* ((k (sign-sha-ed25519 r a message))
+               (x (multiple s *elliptic-g*))
+               (y (addition p (multiple k public))))
+          (equal-point x y))))))
 
 ;;  ed448
 (defun verify-ed448 (public message r s)
-  (let ((a (encode public))
-        (p (decode r)))
-    (cond ((or (null p)) (values nil :error))
-          ((<= *elliptic-n* s) nil)
-          (t (let* ((k (sign-sha-ed448 r a message))
-                    (x (multiple s *elliptic-g*))
-                    (y (addition p (multiple k public))))
-               (equal-point x y))))))
+  (when (< s *elliptic-n*)
+    (let ((a (encode public))
+          (p (decode r)))
+      (when p
+        (let* ((k (sign-sha-ed448 r a message))
+               (x (multiple s *elliptic-g*))
+               (y (addition p (multiple k public))))
+          (equal-point x y))))))
 
 ;;  verify
 (defun verify (public message r s)

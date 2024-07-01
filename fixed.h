@@ -247,6 +247,8 @@ void mul_fixed(fixed s);
 void mul_square_fixed(fixed s);
 
 /* division */
+void div1_fixptr(fixed s, fixptr x1, fixptr y1, fixptr q1, fixptr r1);
+void rem1_fixptr(fixed s, fixptr x1, fixptr y1, fixptr r1);
 void div_fixptr(fixed s, fixptr x2, fixptr y1, fixptr q2, fixptr r1);
 void rem_fixptr(fixed s, fixptr x2, fixptr y1, fixptr r1);
 void div_fixed(fixed s);

@@ -60,6 +60,8 @@ extern fixptr Elliptic_ed448_p2;
 extern fixptr Elliptic_ed448_n2;
 extern fixptr3 Elliptic_ed448_g;
 extern fixptr3 Elliptic_ed448_o;
+extern uint8_t Elliptic_ed448_sha_size;
+extern uint8_t Elliptic_ed448_sha_context[256];
 
 /* vector */
 void push3_fixed(fixed s, fixptr3 r);
@@ -74,13 +76,13 @@ void memcpy3_fixed(fixed s, fixptr3 dst, fixptr3 src);
 void memcpy4_fixed(fixed s, fixptr4 dst, fixptr4 src);
 
 /* operator */
+void rem1_elliptic_curve(fixed s, fixptr x1, fixptr r1, fixptr curve);
+
 void rem2_elliptic_curve(fixed s, fixptr x2, fixptr r1, fixptr curve_p);
 void rem2_elliptic_secp256k1(fixed s, fixptr x2, fixptr r1);
 void rem2_elliptic_secp256r1(fixed s, fixptr x2, fixptr r1);
 void rem2_elliptic_ed25519(fixed s, fixptr x2, fixptr r1);
 void rem2_elliptic_ed448(fixed s, fixptr x2, fixptr r1);
-
-void rem1_elliptic_curve(fixptr r, fixptr curve_p, fixsize word1);
 
 void add_elliptic_curve(fixptr x, fixptr y, fixptr r, fixptr curve_p, fixsize word1);
 void add_elliptic_secp256k1(fixptr x, fixptr y, fixptr r, fixsize word1);

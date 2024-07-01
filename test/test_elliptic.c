@@ -1153,12 +1153,13 @@ static int test_decode_secp256k1(void)
 {
 	fixed s;
 	fixptr *a;
-	fixptr3 r3;
+	fixptr3 r3, g3;
 	fixsize root;
 	vector2_secp256k1 v;
 
 	s = make_secp256k1_fixed();
 	push3_fixed(s, r3);
+	push3_fixed(s, g3);
 
 	/* O */
 	memset(v, 0xAA, vector2_size_secp256k1);
@@ -1188,6 +1189,28 @@ static int test_decode_secp256k1(void)
 	test(valid_secp256k1(s, r3), "decode_secp256k1.10");
 	test(equal_point_secp256k1(s, a, r3), "decode_secp256k1.11");
 
+	/* 2G */
+	memset(v, 0xAA, vector2_size_secp256k1);
+	a = Elliptic_secp256k1_g;
+	doubling_secp256k1(s, a, g3);
+	encode_secp256k1(s, g3, v, 0);
+	root = s->index;
+	test(decode_secp256k1(s, v, r3) == 0, "decode_secp256k1.12");
+	test(root == s->index, "decode_secp256k1.13");
+	test(valid_secp256k1(s, r3), "decode_secp256k1.14");
+	test(equal_point_secp256k1(s, g3, r3), "decode_secp256k1.15");
+
+	/* 2G */
+	memset(v, 0xAA, vector2_size_secp256k1);
+	a = Elliptic_secp256k1_g;
+	doubling_secp256k1(s, a, g3);
+	encode_secp256k1(s, g3, v, 1);
+	root = s->index;
+	test(decode_secp256k1(s, v, r3) == 0, "decode_secp256k1.16");
+	test(root == s->index, "decode_secp256k1.17");
+	test(valid_secp256k1(s, r3), "decode_secp256k1.18");
+	test(equal_point_secp256k1(s, g3, r3), "decode_secp256k1.19");
+
 	free_fixed(s);
 
 	Return;
@@ -1197,12 +1220,13 @@ static int test_decode_secp256r1(void)
 {
 	fixed s;
 	fixptr *a;
-	fixptr3 r3;
+	fixptr3 r3, g3;
 	fixsize root;
 	vector2_secp256r1 v;
 
 	s = make_secp256r1_fixed();
 	push3_fixed(s, r3);
+	push3_fixed(s, g3);
 
 	/* O */
 	memset(v, 0xAA, vector2_size_secp256r1);
@@ -1231,6 +1255,28 @@ static int test_decode_secp256r1(void)
 	test(root == s->index, "decode_secp256r1.9");
 	test(valid_secp256r1(s, r3), "decode_secp256r1.10");
 	test(equal_point_secp256r1(s, a, r3), "decode_secp256r1.11");
+
+	/* 2G */
+	memset(v, 0xAA, vector2_size_secp256r1);
+	a = Elliptic_secp256r1_g;
+	doubling_secp256r1(s, a, g3);
+	encode_secp256r1(s, g3, v, 0);
+	root = s->index;
+	test(decode_secp256r1(s, v, r3) == 0, "decode_secp256r1.12");
+	test(root == s->index, "decode_secp256r1.13");
+	test(valid_secp256r1(s, r3), "decode_secp256r1.14");
+	test(equal_point_secp256r1(s, g3, r3), "decode_secp256r1.15");
+
+	/* 2G */
+	memset(v, 0xAA, vector2_size_secp256r1);
+	a = Elliptic_secp256r1_g;
+	doubling_secp256r1(s, a, g3);
+	encode_secp256r1(s, g3, v, 1);
+	root = s->index;
+	test(decode_secp256r1(s, v, r3) == 0, "decode_secp256r1.16");
+	test(root == s->index, "decode_secp256r1.17");
+	test(valid_secp256r1(s, r3), "decode_secp256r1.18");
+	test(equal_point_secp256r1(s, g3, r3), "decode_secp256r1.19");
 
 	free_fixed(s);
 
@@ -1343,33 +1389,40 @@ static int test_private(void)
 {
 	fixed s;
 	fixptr x;
+	fixsize root;
 
 	s = make_secp256k1_fixed();
 	x = push1get_fixed(s);
 	setv_fixptr(x, s->word1, 0);
+	root = s->index;
 	private_secp256k1(s, &random_state, x);
-	test(! zerop_fixptr(x, s->word1), "private.1");
+	test(root == s->index, "private.1");
+	test(! zerop_fixptr(x, s->word1), "private.2");
 	free_fixed(s);
 
 	s = make_secp256r1_fixed();
 	x = push1get_fixed(s);
 	setv_fixptr(x, s->word1, 0);
+	root = s->index;
 	private_secp256r1(s, &random_state, x);
-	test(! zerop_fixptr(x, s->word1), "private.2");
+	test(root == s->index, "private.3");
+	test(! zerop_fixptr(x, s->word1), "private.4");
 	free_fixed(s);
 
 	s = make_ed25519_fixed();
 	x = push1get_fixed(s);
 	setv_fixptr(x, s->word1, 0);
+	root = s->index;
 	private_ed25519(s, &random_state, x);
-	test(1, "private.3");
+	test(root == s->index, "private.5");
 	free_fixed(s);
 
 	s = make_ed448_fixed();
 	x = push1get_fixed(s);
 	setv_fixptr(x, s->word1, 0);
+	root = s->index;
 	private_ed448(s, &random_state, x);
-	test(1, "private.4");
+	test(root == s->index, "private.6");
 	free_fixed(s);
 
 	Return;
@@ -1384,6 +1437,7 @@ static int test_public_secp256k1(void)
 	fixed s;
 	fixptr *g, x;
 	fixptr3 r;
+	fixsize root;
 
 	s = make_secp256k1_fixed();
 	x = push1get_fixed(s);
@@ -1391,8 +1445,10 @@ static int test_public_secp256k1(void)
 
 	g = Elliptic_secp256k1_g;
 	setv_fixptr(x, s->word1, 1);
+	root = s->index;
 	public_secp256k1(s, x, r);
-	test(equal_point_secp256k1(s, g, r), "public_secp256k1.1");
+	test(root == s->index, "public_secp256k1.1");
+	test(equal_point_secp256k1(s, g, r), "public_secp256k1.2");
 	free_fixed(s);
 
 	Return;
@@ -1403,6 +1459,7 @@ static int test_public_secp256r1(void)
 	fixed s;
 	fixptr *g, x;
 	fixptr3 r;
+	fixsize root;
 
 	s = make_secp256r1_fixed();
 	x = push1get_fixed(s);
@@ -1410,8 +1467,10 @@ static int test_public_secp256r1(void)
 
 	g = Elliptic_secp256r1_g;
 	setv_fixptr(x, s->word1, 1);
+	root = s->index;
 	public_secp256r1(s, x, r);
-	test(equal_point_secp256r1(s, g, r), "public_secp256r1.1");
+	test(root == s->index, "public_secp256r1.1");
+	test(equal_point_secp256r1(s, g, r), "public_secp256r1.2");
 	free_fixed(s);
 
 	Return;
@@ -1423,6 +1482,7 @@ static int public_pq_ed25519(const char *p, const char *q)
 	fixed s;
 	fixptr x;
 	fixptr4 r4, p4;
+	fixsize root;
 	vector1_ed25519 v1;
 	vector2_ed25519 v2;
 
@@ -1434,7 +1494,10 @@ static int public_pq_ed25519(const char *p, const char *q)
 	push4_fixed(s, p4);
 
 	input_fixptr(x, s->word1, v1, vector1_size_ed25519, 1);
+	root = s->index;
 	public_ed25519(s, x, p4);
+	if (root != s->index)
+		return 0;
 	if (decode_ed25519(s, v2, r4))
 		return 0;
 	check = equal_point_ed25519(s, p4, r4);
@@ -1491,6 +1554,7 @@ static int public_pq_ed448(const char *p, const char *q)
 	fixed s;
 	fixptr x;
 	fixptr3 r3, p3;
+	fixsize root;
 	vector1_ed448 v1;
 	vector2_ed448 v2;
 
@@ -1501,7 +1565,10 @@ static int public_pq_ed448(const char *p, const char *q)
 	push3_fixed(s, r3);
 	push3_fixed(s, p3);
 
+	root = s->index;
 	input_fixptr(x, s->word1, v1, vector1_size_ed448, 1);
+	if (root != s->index)
+		return 0;
 	public_ed448(s, x, p3);
 	if (decode_ed448(s, v2, r3))
 		return 0;
@@ -1575,6 +1642,496 @@ static int test_public_ed448(void)
 
 
 /*
+ *  sign
+ */
+static int test_sign_secp256k1(void)
+{
+	int check;
+	fixed s;
+	fixptr x, sign_r, sign_s;
+	fixptr3 y;
+	fixsize root;
+
+	s = make_secp256k1_fixed();
+	x = push1get_fixed(s);
+	sign_r = push1get_fixed(s);
+	sign_s = push1get_fixed(s);
+	push3_fixed(s, y);
+
+	/* ok */
+	private_secp256k1(s, &random_state, x);
+	public_secp256k1(s, x, y);
+	root = s->index;
+	sign_secp256k1(s, &random_state, x, "Hello", 5, sign_r, sign_s);
+	test(root == s->index, "sign_secp256k1.1");
+	check = verify_secp256k1(s, y, "Hello", 5, sign_r, sign_s);
+	test(check, "sign_secp256k1.2");
+
+	/* Hallo */
+	private_secp256k1(s, &random_state, x);
+	public_secp256k1(s, x, y);
+	root = s->index;
+	sign_secp256k1(s, &random_state, x, "Hello", 5, sign_r, sign_s);
+	test(root == s->index, "sign_secp256k1.3");
+	check = verify_secp256k1(s, y, "Hallo", 5, sign_r, sign_s);
+	test(! check, "sign_secp256k1.4");
+
+	/* public */
+	private_secp256k1(s, &random_state, x);
+	public_secp256k1(s, x, y);
+	root = s->index;
+	sign_secp256k1(s, &random_state, x, "Hello", 5, sign_r, sign_s);
+	test(root == s->index, "sign_secp256k1.5");
+	doubling_secp256k1(s, y, y);
+	check = verify_secp256k1(s, y, "Hello", 5, sign_r, sign_s);
+	test(! check, "sign_secp256k1.6");
+
+	free_fixed(s);
+
+	Return;
+}
+
+static int test_sign_secp256r1(void)
+{
+	int check;
+	fixed s;
+	fixptr x, sign_r, sign_s;
+	fixptr3 y;
+	fixsize root;
+
+	s = make_secp256r1_fixed();
+	x = push1get_fixed(s);
+	sign_r = push1get_fixed(s);
+	sign_s = push1get_fixed(s);
+	push3_fixed(s, y);
+
+	/* ok */
+	private_secp256r1(s, &random_state, x);
+	public_secp256r1(s, x, y);
+	root = s->index;
+	sign_secp256r1(s, &random_state, x, "Hello", 5, sign_r, sign_s);
+	test(root == s->index, "sign_secp256r1.1");
+	check = verify_secp256r1(s, y, "Hello", 5, sign_r, sign_s);
+	test(check, "sign_secp256r1.2");
+
+	/* Hallo */
+	private_secp256r1(s, &random_state, x);
+	public_secp256r1(s, x, y);
+	root = s->index;
+	sign_secp256r1(s, &random_state, x, "Hello", 5, sign_r, sign_s);
+	test(root == s->index, "sign_secp256r1.3");
+	check = verify_secp256r1(s, y, "Hallo", 5, sign_r, sign_s);
+	test(! check, "sign_secp256r1.4");
+
+	/* public */
+	private_secp256r1(s, &random_state, x);
+	public_secp256r1(s, x, y);
+	root = s->index;
+	sign_secp256r1(s, &random_state, x, "Hello", 5, sign_r, sign_s);
+	test(root == s->index, "sign_secp256r1.5");
+	doubling_secp256r1(s, y, y);
+	check = verify_secp256r1(s, y, "Hello", 5, sign_r, sign_s);
+	test(! check, "sign_secp256r1.6");
+
+	free_fixed(s);
+
+	Return;
+}
+
+static int test_sign_ed25519(void)
+{
+	int check;
+	fixed s;
+	fixptr x, sign_r, sign_s;
+	fixptr4 y;
+	fixsize root;
+
+	s = make_ed25519_fixed();
+	x = push1get_fixed(s);
+	sign_r = push1get_fixed(s);
+	sign_s = push1get_fixed(s);
+	push4_fixed(s, y);
+
+	/* ok */
+	private_ed25519(s, &random_state, x);
+	public_ed25519(s, x, y);
+	root = s->index;
+	sign_ed25519(s, x, "Hello", 5, sign_r, sign_s);
+	test(root == s->index, "sign_ed25519.1");
+	check = verify_ed25519(s, y, "Hello", 5, sign_r, sign_s);
+	test(check, "sign_ed25519.2");
+
+	/* Hallo */
+	private_ed25519(s, &random_state, x);
+	public_ed25519(s, x, y);
+	root = s->index;
+	sign_ed25519(s, x, "Hello", 5, sign_r, sign_s);
+	test(root == s->index, "sign_ed25519.3");
+	check = verify_ed25519(s, y, "Hallo", 5, sign_r, sign_s);
+	test(! check, "sign_ed25519.4");
+
+	/* public */
+	private_ed25519(s, &random_state, x);
+	public_ed25519(s, x, y);
+	root = s->index;
+	sign_ed25519(s, x, "Hello", 5, sign_r, sign_s);
+	test(root == s->index, "sign_ed25519.5");
+	doubling_ed25519(s, y, y);
+	check = verify_ed25519(s, y, "Hello", 5, sign_r, sign_s);
+	test(! check, "sign_ed25519.6");
+
+	free_fixed(s);
+
+	Return;
+}
+
+static int test_sign_ed448(void)
+{
+	int check;
+	fixed s;
+	fixptr x, sign_r, sign_s;
+	fixptr3 y;
+	fixsize root;
+
+	s = make_ed448_fixed();
+	x = push1get_fixed(s);
+	sign_r = push1get_fixed(s);
+	sign_s = push1get_fixed(s);
+	push3_fixed(s, y);
+
+	/* ok */
+	private_ed448(s, &random_state, x);
+	public_ed448(s, x, y);
+	root = s->index;
+	sign_ed448(s, x, "Hello", 5, sign_r, sign_s);
+	test(root == s->index, "sign_ed448.1");
+	check = verify_ed448(s, y, "Hello", 5, sign_r, sign_s);
+	test(check, "sign_ed448.2");
+
+	/* Hallo */
+	private_ed448(s, &random_state, x);
+	public_ed448(s, x, y);
+	root = s->index;
+	sign_ed448(s, x, "Hello", 5, sign_r, sign_s);
+	test(root == s->index, "sign_ed448.3");
+	check = verify_ed448(s, y, "Hallo", 5, sign_r, sign_s);
+	test(! check, "sign_ed448.4");
+
+	/* public */
+	private_ed448(s, &random_state, x);
+	public_ed448(s, x, y);
+	root = s->index;
+	sign_ed448(s, x, "Hello", 5, sign_r, sign_s);
+	test(root == s->index, "sign_ed448.5");
+	doubling_ed448(s, y, y);
+	check = verify_ed448(s, y, "Hello", 5, sign_r, sign_s);
+	test(! check, "sign_ed448.6");
+
+	free_fixed(s);
+
+	Return;
+}
+
+
+/*
+ *  string
+ */
+static int test_encode_string_secp256k1(void)
+{
+	int check;
+	fixed s;
+	fixptr x, y;
+	fixptr3 a, b;
+	string1_secp256k1 s1;
+	string2_secp256k1 s2;
+
+	s = make_secp256k1_fixed();
+	x = push1get_fixed(s);
+	y = push1get_fixed(s);
+	push3_fixed(s, a);
+	push3_fixed(s, b);
+
+	/* integer */
+	private_secp256k1(s, &random_state, x);
+	encode1_string_secp256k1(s, x, s1);
+	check = decode1_string_secp256k1(s, s1, y);
+	test(check == 0, "string_secp256k1.1");
+	test(compare_fixptr(x, s->word1, y, s->word1) == 0, "string_secp256k1.2");
+
+	/* point */
+	doubling_secp256k1(s, Elliptic_secp256k1_g, a);
+	encode2_string_secp256k1(s, a, s2);
+	check = decode2_string_secp256k1(s, s2, b);
+	test(check == 0, "string_secp256k1.3");
+	test(equal_point_secp256k1(s, a, b), "string_secp256k1.4");
+
+	free_fixed(s);
+
+	Return;
+}
+
+static int test_encode_string_secp256r1(void)
+{
+	int check;
+	fixed s;
+	fixptr x, y;
+	fixptr3 a, b;
+	string1_secp256r1 s1;
+	string2_secp256r1 s2;
+
+	s = make_secp256r1_fixed();
+	x = push1get_fixed(s);
+	y = push1get_fixed(s);
+	push3_fixed(s, a);
+	push3_fixed(s, b);
+
+	/* integer */
+	private_secp256r1(s, &random_state, x);
+	encode1_string_secp256r1(s, x, s1);
+	check = decode1_string_secp256r1(s, s1, y);
+	test(check == 0, "string_secp256r1.1");
+	test(compare_fixptr(x, s->word1, y, s->word1) == 0, "string_secp256r1.2");
+
+	/* point */
+	doubling_secp256r1(s, Elliptic_secp256r1_g, a);
+	encode2_string_secp256r1(s, a, s2);
+	check = decode2_string_secp256r1(s, s2, b);
+	test(check == 0, "string_secp256r1.3");
+	test(equal_point_secp256r1(s, a, b), "string_secp256r1.4");
+
+	free_fixed(s);
+
+	Return;
+}
+
+static int test_encode_string_ed25519(void)
+{
+	int check;
+	fixed s;
+	fixptr x, y;
+	fixptr4 a, b;
+	string1_ed25519 s1;
+	string2_ed25519 s2;
+
+	s = make_ed25519_fixed();
+	x = push1get_fixed(s);
+	y = push1get_fixed(s);
+	push4_fixed(s, a);
+	push4_fixed(s, b);
+
+	/* integer */
+	private_ed25519(s, &random_state, x);
+	encode1_string_ed25519(s, x, s1);
+	check = decode1_string_ed25519(s, s1, y);
+	test(check == 0, "string_ed25519.1");
+	test(compare_fixptr(x, s->word1, y, s->word1) == 0, "string_ed25519.2");
+
+	/* point */
+	doubling_ed25519(s, Elliptic_ed25519_g, a);
+	encode2_string_ed25519(s, a, s2);
+	check = decode2_string_ed25519(s, s2, b);
+	test(check == 0, "string_ed25519.3");
+	test(equal_point_ed25519(s, a, b), "string_ed25519.4");
+
+	free_fixed(s);
+
+	Return;
+}
+
+static int test_encode_string_ed448(void)
+{
+	int check;
+	fixed s;
+	fixptr x, y;
+	fixptr3 a, b;
+	string1_ed448 s1;
+	string2_ed448 s2;
+
+	s = make_ed448_fixed();
+	x = push1get_fixed(s);
+	y = push1get_fixed(s);
+	push3_fixed(s, a);
+	push3_fixed(s, b);
+
+	/* integer */
+	private_ed448(s, &random_state, x);
+	encode1_string_ed448(s, x, s1);
+	check = decode1_string_ed448(s, s1, y);
+	test(check == 0, "string_ed448.1");
+	test(compare_fixptr(x, s->word1, y, s->word1) == 0, "string_ed448.2");
+
+	/* point */
+	doubling_ed448(s, Elliptic_ed448_g, a);
+	encode2_string_ed448(s, a, s2);
+	check = decode2_string_ed448(s, s2, b);
+	test(check == 0, "string_ed448.3");
+	test(equal_point_ed448(s, a, b), "string_ed448.4");
+
+	free_fixed(s);
+
+	Return;
+}
+
+static int test_string_secp256k1(void)
+{
+	char private_key[string1_size_secp256k1];
+	char public_key[string2_size_secp256k1];
+	char sign_r[string1_size_secp256k1];
+	char sign_s[string1_size_secp256k1];
+	int check;
+
+	private_string_secp256k1(private_key);
+	public_string_secp256k1(private_key, public_key);
+	sign_string_secp256k1(private_key, "Hello", 5, sign_r, sign_s);
+	sign_string_secp256k1(private_key, "Hello", 5, sign_r, sign_s);
+	check = verify_string_secp256k1(public_key, "Hello", 5, sign_r, sign_s);
+	test(check, "string_secp256k1.1");
+
+	Return;
+}
+
+static int test_string_secp256r1(void)
+{
+	char private_key[string1_size_secp256r1];
+	char public_key[string2_size_secp256r1];
+	char sign_r[string1_size_secp256r1];
+	char sign_s[string1_size_secp256r1];
+	int check;
+
+	private_string_secp256r1(private_key);
+	public_string_secp256r1(private_key, public_key);
+	sign_string_secp256r1(private_key, "Hello", 5, sign_r, sign_s);
+	sign_string_secp256r1(private_key, "Hello", 5, sign_r, sign_s);
+	check = verify_string_secp256r1(public_key, "Hello", 5, sign_r, sign_s);
+	test(check, "string_secp256r1.1");
+
+	Return;
+}
+
+static int test_string_ed25519(void)
+{
+	char private_key[string1_size_ed25519];
+	char public_key[string2_size_ed25519];
+	char sign_r[string1_size_ed25519];
+	char sign_s[string1_size_ed25519];
+	int check;
+
+	private_string_ed25519(private_key);
+	public_string_ed25519(private_key, public_key);
+	sign_string_ed25519(private_key, "Hello", 5, sign_r, sign_s);
+	sign_string_ed25519(private_key, "Hello", 5, sign_r, sign_s);
+	check = verify_string_ed25519(public_key, "Hello", 5, sign_r, sign_s);
+	test(check, "string_ed25519.1");
+
+	Return;
+}
+
+static int test_string_ed448(void)
+{
+	char private_key[string1_size_ed448];
+	char public_key[string2_size_ed448];
+	char sign_r[string1_size_ed448];
+	char sign_s[string1_size_ed448];
+	int check;
+
+	private_string_ed448(private_key);
+	public_string_ed448(private_key, public_key);
+	sign_string_ed448(private_key, "Hello", 5, sign_r, sign_s);
+	sign_string_ed448(private_key, "Hello", 5, sign_r, sign_s);
+	check = verify_string_ed448(public_key, "Hello", 5, sign_r, sign_s);
+	test(check, "string_ed448.1");
+
+	Return;
+}
+
+
+/*
+ *  verify
+ */
+static int verify_rfc8032_ed25519(const char *private_key,
+		const char *ptr, size_t size,
+		const char *sign_r, const char *sign_s)
+{
+	string2_ed25519 v;
+	public_string_ed25519(private_key, v);
+	return verify_string_ed25519(v, ptr, size, sign_r, sign_s);
+}
+
+static int verify_rfc8032_ed448(const char *private_key,
+		const char *ptr, size_t size,
+		const char *sign_r, const char *sign_s)
+{
+	string2_ed448 v;
+	public_string_ed448(private_key, v);
+	return verify_string_ed448(v, ptr, size, sign_r, sign_s);
+}
+
+static int test_verify_rfc8032_ed25519(void)
+{
+	const char *p, *r, *s;
+
+	p = "9d61b19deffd5a60ba844af492ec2cc4"
+		"4449c5697b326919703bac031cae7f60";
+	r = "e5564300c360ac729086e2cc806e828a"
+		"84877f1eb8e5d974d873e06522490155";
+	s = "5fb8821590a33bacc61e39701cf9b46b"
+		"d25bf5f0595bbe24655141438e7a100b";
+	test(verify_rfc8032_ed25519(p, "", 0, r, s), "verify-ed25519.1");
+
+	Return;
+}
+
+static int test_verify_rfc8032_ed448(void)
+{
+	const char *p, *r, *s;
+
+	p = "6c82a562cb808d10d632be89c8513ebf6c929f34ddfa8c9f63c9960ef6e348a3"
+		"528c8a3fcc2f044e39a3fc5b94492f8f032e7549a20098f95b";
+	r = "533a37f6bbe457251f023c0d88f976ae2dfb504a843e34d2074fd823d41a591f"
+		"2b233f034f628281f2fd7a22ddd47d7828c59bd0a21bfd3980";
+	s = "ff0d2028d4b18a9df63e006c5d1c2d345b925d8dc00b4104852db99ac5c7cdda"
+		"8530a113a0f4dbb61149f05a7363268c71d95808ff2e652600";
+	test(verify_rfc8032_ed448(p, "", 0, r, s), "verify-ed448.1");
+
+	Return;
+}
+
+
+/*
+ *  signature
+ */
+static int test_verify_signature(void)
+{
+	const char *p, *r, *s;
+
+	p = "03FEEF09658067CFBE3BE8685DDCE8E9C03B4A397ADC4A0255CE0B29FC63BCDC9C";
+	r = "7C7EDD22B0AED24D1B4A3826E228CE52EC897D52826D5912459238FC36008B86";
+	s = "38C86C613A977CD5D1E024380FB56CDB924B0D972E903AB740F4E7F3A90F62BC";
+	test(verify_string_secp256k1(p, "Hello", 5, r, s), "verify_signature.1");
+
+	p = "03CD92CF7B1C9CE9858383806B8540D72FB022BE577E21DE02B8EAA27371DB7AF2";
+	r = "FF6331919D62BFF9236113998250AB9079AA81C83085A27CC38A2CC0EEDDD98D";
+	s = "1A374ADE37A61F6014C29C723C425BB3E6B519D517E16F66A46869F8EC535F89";
+	test(verify_string_secp256r1(p, "Hello", 5, r, s), "verify_signature.2");
+
+	p = "75AB16F53A060E7AF9A4B8ECEA3D4DEF058AED2C626FEC96D5505C4A7D922960";
+	r = "285D61D0DAC982F09365DA699DFD10A7B1B3A4D29A8468655A71F49965D4CEE1";
+	s = "A58118E7ECAE263034F4BA7EB57BEE8D639C9BAF5BDE6BE97F2F864B3A1A7606";
+	test(verify_string_ed25519(p, "Hello", 5, r, s), "verify_signature.3");
+
+	p = "99AFC3768EE41B96F208EBAF8627908690DC6A5AC64659F93D0A46C20"
+		"92B61E84AD14DD03F7B3F146799C29F65682126D517B7E1EA57716E00";
+	r = "DC38653AAD2F456132602EBC47571DABB56C36BA35D6965F820AFFB0F"
+		"BE478439C7CF1D9EE7033792A23E80811CFAB07DC2B71DDEF526F6700";
+	s = "0E11296ECFACEA4E5E9B795AC4048D711636BE468A99639F953ED1E94"
+		"8A6351F51DE0AE167EB268012E9712F7D6ADD97E80BB36E291C2A2D00";
+	test(verify_string_ed448(p, "Hello", 5, r, s), "verify_signature.4");
+
+	Return;
+}
+
+
+/*
  *  test
  */
 int test_elliptic(void)
@@ -1607,6 +2164,21 @@ int test_elliptic(void)
 	TestCall(test_public_secp256r1);
 	TestCall(test_public_ed25519);
 	TestCall(test_public_ed448);
+	TestCall(test_sign_secp256k1);
+	TestCall(test_sign_secp256r1);
+	TestCall(test_sign_ed25519);
+	TestCall(test_sign_ed448);
+	TestCall(test_encode_string_secp256k1);
+	TestCall(test_encode_string_secp256r1);
+	TestCall(test_encode_string_ed25519);
+	TestCall(test_encode_string_ed448);
+	TestCall(test_string_secp256k1);
+	TestCall(test_string_secp256r1);
+	TestCall(test_string_ed25519);
+	TestCall(test_string_ed448);
+	TestCall(test_verify_rfc8032_ed25519);
+	TestCall(test_verify_rfc8032_ed448);
+	TestCall(test_verify_signature);
 
 	return 0;
 }

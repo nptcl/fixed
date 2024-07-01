@@ -3,6 +3,7 @@
 #include "fixed.h"
 #include "crypt.h"
 #include "elliptic.h"
+#include "public.h"
 #include "random.h"
 #include "signature.h"
 
@@ -16,7 +17,7 @@ static void output_main(fixed s, fixsize word1, const char *x)
 	printf("\n");
 }
 
-int main(void)
+int main_rsa(void)
 {
 	fixed s;
 	fixsize bit_count, stack_size;
@@ -86,6 +87,15 @@ int main(void)
 
 	free_fixed(s);
 
+	return 0;
+}
+
+int main(void)
+{
+	printf("*** RSA\n");
+	main_rsa();
+	printf("\n\n*** ECDSA, EdDSA\n");
+	genkey_elliptic();
 	return 0;
 }
 

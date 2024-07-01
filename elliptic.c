@@ -135,6 +135,8 @@ fixptr Elliptic_ed448_p2 = (fixptr)elliptic_ed448_p2;
 fixptr Elliptic_ed448_n2 = (fixptr)elliptic_ed448_n2;
 fixptr3 Elliptic_ed448_g;
 fixptr3 Elliptic_ed448_o;
+uint8_t Elliptic_ed448_sha_size;
+uint8_t Elliptic_ed448_sha_context[256];
 
 
 /*
@@ -206,13 +208,26 @@ void memcpy4_fixed(fixed s, fixptr4 dst, fixptr4 src)
  *  operator
  */
 
-/* rem1 */
-void rem1_elliptic_curve(fixptr r, fixptr curve_p, fixsize word1)
+/* remloop */
+static void remloop_elliptic_curve(fixptr r, fixptr curve_p, fixsize word1)
 {
 	fixnum ignore;
 
 	while (compare_fixptr(r, word1, curve_p, word1) >= 0)
 		sub_fixptr(r, curve_p, r, word1, &ignore);
+}
+
+
+/* rem1 */
+void rem1_elliptic_curve(fixed s, fixptr x1, fixptr r1, fixptr curve)
+{
+	int check;
+
+	check = compare_fixptr(x1, s->word1, curve, s->word1);
+	if (check < 0)
+		memcpy_fixptr(r1, x1, s->word1);
+	else
+		rem1_fixptr(s, x1, curve, r1);
 }
 
 
@@ -258,7 +273,7 @@ void add_elliptic_curve(fixptr x, fixptr y, fixptr r, fixptr curve_p, fixsize wo
 	if (carry)
 		sub_fixptr(r, curve_p, r, word1, &carry);
 	else
-		rem1_elliptic_curve(r, curve_p, word1);
+		remloop_elliptic_curve(r, curve_p, word1);
 }
 
 void add_elliptic_secp256k1(fixptr x, fixptr y, fixptr r, fixsize word1)
@@ -291,7 +306,7 @@ void dbl_elliptic_curve(fixptr x, fixptr r, fixptr curve_p, fixsize word1)
 	if (carry)
 		sub_fixptr(r, curve_p, r, word1, &carry);
 	else
-		rem1_elliptic_curve(r, curve_p, word1);
+		remloop_elliptic_curve(r, curve_p, word1);
 }
 
 void dbl_elliptic_secp256k1(fixptr x, fixptr r, fixsize word1)
@@ -324,7 +339,7 @@ void sub_elliptic_curve(fixptr x, fixptr y, fixptr r, fixptr curve_p, fixsize wo
 	if (carry)
 		add_fixptr(r, curve_p, r, word1, &carry);
 	else
-		rem1_elliptic_curve(r, curve_p, word1);
+		remloop_elliptic_curve(r, curve_p, word1);
 }
 void sub_elliptic_secp256k1(fixptr x, fixptr y, fixptr r, fixsize word1)
 {
@@ -461,10 +476,27 @@ int string_integer_elliptic(const char *x, void *p, int size, int reverse)
 	errorp = 0;
 	for (i = 0; i < size; i++) {
 		k = i * 2;
-		c1 = string_integer_char_elliptic(x[k + 0], &errorp);
-		c2 = string_integer_char_elliptic(x[k + 1], &errorp);
+		/* c1 */
+		c1 = x[k + 0];
+		if (c1 == 0)
+			break;
+		c1 = string_integer_char_elliptic(c1, &errorp);
+		if (errorp)
+			break;
+		/* c2 */
+		c2 = x[k + 1];
+		if (c2 == 0)
+			break;
+		c2 = string_integer_char_elliptic(c2, &errorp);
+		if (errorp)
+			break;
+		/* set */
 		u = reverse? (size - i - 1): i;
 		r[u] = (c1 << 4U) | c2;
+	}
+	for (; i < size; i++) {
+		u = reverse? (size - i - 1): i;
+		r[u] = 0;
 	}
 
 	return errorp;
@@ -799,6 +831,7 @@ void init_elliptic_ed448(void)
 	init_elliptic_macro(s, ed448, y, 4);
 	init_elliptic_macro(s, ed448, n, 5);
 	Elliptic_ed448_h = 0x04;
+	Elliptic_ed448_sha_size = 0;
 	init_elliptic_ed448_p2(s);
 	init_elliptic_ed448_n2(s);
 	init_elliptic_ed448_g(s);

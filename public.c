@@ -297,8 +297,9 @@ static int valid_edwards_elliptic(fixed s, fixptr x0, fixptr y0,
 	rem2_elliptic_curve(s, w, y, curve_p);
 
 	/* y <- 1 + y */
-	addv_fixptr(y, s->word1, 1, &ignore);
-	rem1_elliptic_curve(y, curve_p, word1);
+	addv_fixptr(y, word1, 1, &ignore);
+	if (compare_fixptr(y, word1, curve_p, word1) == 0)
+		setv_fixptr(y, word1, 0);
 
 	/* compare */
 	compare = compare_fixptr(x, word1, y, word1);
@@ -430,8 +431,7 @@ int neutral_ed448(fixed s, fixptr3 r)
 /*
  *  make private key
  */
-static void private_weierstrass(fixed s,
-		struct fixed_random *state, fixptr r, fixptr curve_n)
+void private_weierstrass(fixed s, struct fixed_random *state, fixptr r, fixptr curve_n)
 {
 	do {
 		random_less_fixptr(state, Elliptic_secp256k1_n, r, s->word1);
@@ -455,7 +455,11 @@ void private_ed25519(fixed s, struct fixed_random *state, fixptr r)
 
 void private_ed448(fixed s, struct fixed_random *state, fixptr r)
 {
+	char x[57];
+
 	random_full_fixptr(state, r, s->word1);
+	output_fixptr(r, s->word1, x, 57, 0);
+	input_fixptr(r, s->word1, x, 57, 0);
 }
 
 
@@ -554,7 +558,8 @@ void public_ed448(fixed s, fixptr private_key, fixptr3 r)
  */
 int encode_secp256k1(fixed s, fixptr3 v, vector2_secp256k1 r, int compress)
 {
-	int y0;
+	int y0, size;
+	fixptr x, y;
 	fixsize word1;
 
 	/* z = 0 */
@@ -565,23 +570,60 @@ int encode_secp256k1(fixed s, fixptr3 v, vector2_secp256k1 r, int compress)
 	}
 
 	/* uncompress */
+	x = push1get_fixed(s);
+	y = push1get_fixed(s);
+	affine_secp256k1(s, v, x, y);
 	if (! compress) {
 		r[0] = 0x04;
-		output_fixptr(v[0], word1, r + 1, 32, 0);
-		output_fixptr(v[1], word1, r + 1 + 32, 32, 0);
-		return 1 + 32 + 32;
+		output_fixptr(x, word1, r + 1, 32, 0);
+		output_fixptr(y, word1, r + 1 + 32, 32, 0);
+		size = 1 + 32 + 32;
+	}
+	else {
+		/* compress */
+		y0 = (y[0] & 0x01) != 0;
+		r[0] = y0? 0x03: 0x02;
+		output_fixptr(x, word1, r + 1, 32, 0);
+		size = 1 + 32;
 	}
 
-	/* compress */
-	y0 = (v[1][0] & 0x01) != 0;
-	r[0] = y0? 0x03: 0x02;
-	output_fixptr(v[0], word1, r + 1, 32, 0);
-	return 1 + 32;
+	pop1n_fixed(s, 2);
+	return size;
 }
 
 int encode_secp256r1(fixed s, fixptr3 v, vector2_secp256r1 r, int compress)
 {
-	return encode_secp256k1(s, v, r, compress);
+	int y0, size;
+	fixptr x, y;
+	fixsize word1;
+
+	/* z = 0 */
+	word1 = s->word1;
+	if (zerop_fixptr(v[2], word1)) {
+		r[0] = 0;
+		return 1;
+	}
+
+	/* uncompress */
+	x = push1get_fixed(s);
+	y = push1get_fixed(s);
+	affine_secp256r1(s, v, x, y);
+	if (! compress) {
+		r[0] = 0x04;
+		output_fixptr(x, word1, r + 1, 32, 0);
+		output_fixptr(y, word1, r + 1 + 32, 32, 0);
+		size = 1 + 32 + 32;
+	}
+	else {
+		/* compress */
+		y0 = (y[0] & 0x01) != 0;
+		r[0] = y0? 0x03: 0x02;
+		output_fixptr(x, word1, r + 1, 32, 0);
+		size = 1 + 32;
+	}
+
+	pop1n_fixed(s, 2);
+	return size;
 }
 
 int encode_ed25519(fixed s, fixptr4 v, vector2_ed25519 r)
@@ -984,12 +1026,10 @@ static int decode_x_ed448(fixed s, fixptr y, fixptr x)
 int decode_ed448(fixed s, vector2_ed448 v, fixptr3 r)
 {
 	int x0, check;
-	fixptr w2, x, y;
-	fixsize word1, word2;
+	fixptr x, y;
+	fixsize word1;
 
 	word1 = s->word1;
-	word2 = s->word2;
-	w2 = push2get_fixed(s);
 	x = push1get_fixed(s);
 	y = push1get_fixed(s);
 
@@ -1011,14 +1051,196 @@ int decode_ed448(fixed s, vector2_ed448 v, fixptr3 r)
 	memcpy_fixptr(r[0], x, word1);
 	memcpy_fixptr(r[1], y, word1);
 	setv_fixptr(r[2], word1, 1);
-	/* t */
-	mul_fixptr(x, y, word1, w2, word2);
-	rem2_elliptic_ed448(s, w2, r[3]);
 
 finish:
 	pop1n_fixed(s, 2);
-	pop2_fixed(s);
 
 	return check;
+}
+
+
+/*
+ *  string
+ */
+
+/* secp256k1 */
+int encode1_string_secp256k1(fixed s, fixptr x, string1_secp256k1 r)
+{
+	vector1_secp256k1 memory;
+
+	output_fixptr(x, s->word1, memory, vector1_size_secp256k1, 0);
+	integer_string_elliptic(memory, vector1_size_secp256k1, r, 0);
+
+	return string1_size_secp256k1;
+}
+
+int encode2_string_secp256k1(fixed s, fixptr3 x, string2_secp256k1 r)
+{
+	int size;
+	vector2_secp256k1 memory;
+
+	size = encode_secp256k1(s, x, memory, 1);
+	integer_string_elliptic(memory, size, r, 0);
+
+	return size * 2;
+}
+
+int decode1_string_secp256k1(fixed s, const string1_secp256k1 x, fixptr r)
+{
+	vector1_secp256k1 memory;
+
+	if (string_integer_elliptic(x, memory, vector1_size_secp256k1, 0))
+		return 1;
+	input_fixptr(r, s->word1, memory, vector1_size_secp256k1, 0);
+
+	return 0;
+}
+
+int decode2_string_secp256k1(fixed s, const string2_secp256k1 x, fixptr3 r)
+{
+	vector2_secp256k1 memory;
+
+	if (string_integer_elliptic(x, memory, vector2_size_secp256k1, 0))
+		return 1;
+	if (decode_secp256k1(s, memory, r))
+		return 1;
+
+	return 0;
+}
+
+
+/* secp256r1 */
+int encode1_string_secp256r1(fixed s, fixptr x, string1_secp256r1 r)
+{
+	vector1_secp256r1 memory;
+
+	output_fixptr(x, s->word1, memory, vector1_size_secp256r1, 0);
+	integer_string_elliptic(memory, vector1_size_secp256r1, r, 0);
+
+	return string1_size_secp256r1;
+}
+
+int encode2_string_secp256r1(fixed s, fixptr3 x, string2_secp256r1 r)
+{
+	int size;
+	vector2_secp256r1 memory;
+
+	size = encode_secp256r1(s, x, memory, 1);
+	integer_string_elliptic(memory, size, r, 0);
+
+	return size * 2;
+}
+
+int decode1_string_secp256r1(fixed s, const string1_secp256r1 x, fixptr r)
+{
+	vector1_secp256r1 memory;
+
+	if (string_integer_elliptic(x, memory, vector1_size_secp256r1, 0))
+		return 1;
+	input_fixptr(r, s->word1, memory, vector1_size_secp256r1, 0);
+
+	return 0;
+}
+
+int decode2_string_secp256r1(fixed s, const string2_secp256r1 x, fixptr3 r)
+{
+	vector2_secp256r1 memory;
+
+	if (string_integer_elliptic(x, memory, vector2_size_secp256r1, 0))
+		return 1;
+	if (decode_secp256r1(s, memory, r))
+		return 1;
+
+	return 0;
+}
+
+
+/* ed25519 */
+int encode1_string_ed25519(fixed s, fixptr x, string1_ed25519 r)
+{
+	vector1_ed25519 memory;
+
+	output_fixptr(x, s->word1, memory, vector1_size_ed25519, 0);
+	integer_string_elliptic(memory, vector1_size_ed25519, r, 1);
+
+	return string1_size_ed25519;
+}
+
+int encode2_string_ed25519(fixed s, fixptr4 x, string2_ed25519 r)
+{
+	vector2_ed25519 memory;
+
+	encode_ed25519(s, x, memory);
+	integer_string_elliptic(memory, vector2_size_ed25519, r, 0);
+
+	return vector2_size_ed25519;
+}
+
+int decode1_string_ed25519(fixed s, const string1_ed25519 x, fixptr r)
+{
+	vector1_ed25519 memory;
+
+	if (string_integer_elliptic(x, memory, vector1_size_ed25519, 1))
+		return 1;
+	input_fixptr(r, s->word1, memory, vector1_size_ed25519, 0);
+
+	return 0;
+}
+
+int decode2_string_ed25519(fixed s, const string2_ed25519 x, fixptr4 r)
+{
+	vector2_ed25519 memory;
+
+	if (string_integer_elliptic(x, memory, vector2_size_ed25519, 0))
+		return 1;
+	if (decode_ed25519(s, memory, r))
+		return 1;
+
+	return 0;
+}
+
+
+/* ed448 */
+int encode1_string_ed448(fixed s, fixptr x, string1_ed448 r)
+{
+	vector1_ed448 memory;
+
+	output_fixptr(x, s->word1, memory, vector1_size_ed448, 0);
+	integer_string_elliptic(memory, vector1_size_ed448, r, 1);
+
+	return string1_size_ed448;
+}
+
+int encode2_string_ed448(fixed s, fixptr3 x, string2_ed448 r)
+{
+	vector2_ed448 memory;
+
+	encode_ed448(s, x, memory);
+	integer_string_elliptic(memory, vector2_size_ed448, r, 0);
+
+	return vector2_size_ed448;
+}
+
+int decode1_string_ed448(fixed s, const string1_ed448 x, fixptr r)
+{
+	vector1_ed448 memory;
+
+	if (string_integer_elliptic(x, memory, vector1_size_ed448, 1))
+		return 1;
+	input_fixptr(r, s->word1, memory, vector1_size_ed448, 0);
+
+	return 0;
+}
+
+int decode2_string_ed448(fixed s, const string2_ed448 x, fixptr3 r)
+{
+	vector2_ed448 memory;
+
+	if (string_integer_elliptic(x, memory, vector2_size_ed448, 0))
+		return 1;
+	if (decode_ed448(s, memory, r))
+		return 1;
+
+	return 0;
 }
 

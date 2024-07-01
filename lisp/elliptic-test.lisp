@@ -496,12 +496,30 @@
 
 (deftest decode-secp256k1.3
   (with-elliptic-secp256k1
+    (let* ((g (doubling *elliptic-g*))
+           (x (encode g t))
+           (y (decode x)))
+      (and (equal-point g y)
+           (valid y))))
+  t)
+
+(deftest decode-secp256k1.4
+  (with-elliptic-secp256k1
+    (let* ((g (doubling *elliptic-g*))
+           (x (encode g nil))
+           (y (decode x)))
+      (and (equal-point g y)
+           (valid y))))
+  t)
+
+(deftest decode-secp256k1.5
+  (with-elliptic-secp256k1
     (let* ((x (encode *elliptic-o* t))
            (y (decode x)))
       (neutral y)))
   t)
 
-(deftest decode-secp256k1.4
+(deftest decode-secp256k1.6
   (with-elliptic-secp256k1
     (let* ((x (encode *elliptic-o* nil))
            (y (decode x)))
@@ -528,12 +546,30 @@
 
 (deftest decode-secp256r1.3
   (with-elliptic-secp256r1
+    (let* ((g (doubling *elliptic-g*))
+           (x (encode g t))
+           (y (decode x)))
+      (and (equal-point g y)
+           (valid y))))
+  t)
+
+(deftest decode-secp256r1.4
+  (with-elliptic-secp256r1
+    (let* ((g (doubling *elliptic-g*))
+           (x (encode g nil))
+           (y (decode x)))
+      (and (equal-point g y)
+           (valid y))))
+  t)
+
+(deftest decode-secp256r1.5
+  (with-elliptic-secp256r1
     (let* ((x (encode *elliptic-o* t))
            (y (decode x)))
       (neutral y)))
   t)
 
-(deftest decode-secp256r1.4
+(deftest decode-secp256r1.6
   (with-elliptic-secp256r1
     (let* ((x (encode *elliptic-o* nil))
            (y (decode x)))
@@ -1126,6 +1162,21 @@
       "Hello"
       "DC38653AAD2F456132602EBC47571DABB56C36BA35D6965F820AFFB0FBE478439C7CF1D9EE7033792A23E80811CFAB07DC2B71DDEF526F6700"
       "0E11296ECFACEA4E5E9B795AC4048D711636BE468A99639F953ED1E948A6351F51DE0AE167EB268012E9712F7D6ADD97E80BB36E291C2A2D00"))
+  t)
+
+(defun verify-rfc8032-string (private message r s)
+  (verify (make-public (decode1-string private))
+          (map 'vector #'char-code message)
+          (decode1-string r)
+          (decode1-string s)))
+
+(deftest verify.1
+  (with-elliptic-ed25519
+    (verify-rfc8032-string
+      "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
+      ""
+      "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e06522490155"
+      "5fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b"))
   t)
 
 
