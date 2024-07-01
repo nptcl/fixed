@@ -1,5 +1,5 @@
 VPATH = ..:.
-source = test.c test_fixed.c test_elliptic.c \
+source = test.c test_fixed.c test_elliptic.c test_encode.c \
 fixed.c sha.c random.c crypt.c elliptic.c addition.c public.c signature.c
 object = $(source:.c=.o)
 a.out = a.out

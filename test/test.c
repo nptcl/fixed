@@ -58,6 +58,8 @@ void test_abort(void)
 /***********************************************************************
  *  main
  ***********************************************************************/
+struct fixed_random random_state;
+
 int main(void)
 {
 	/* infomation */
@@ -71,8 +73,11 @@ int main(void)
 	/* test */
 	init_fixrandom();
 	init_elliptic();
+	make_fixrandom(&random_state);
+
 	test_fixed();
 	test_elliptic();
+	test_encode();
 	if (test_error)
 		test_abort();
 	printf("OK: %d.\n", test_count);

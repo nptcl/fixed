@@ -569,11 +569,11 @@ int encode_secp256k1(fixed s, fixptr3 v, vector2_secp256k1 r, int compress)
 		return 1;
 	}
 
-	/* uncompress */
 	x = push1get_fixed(s);
 	y = push1get_fixed(s);
 	affine_secp256k1(s, v, x, y);
 	if (! compress) {
+		/* uncompress */
 		r[0] = 0x04;
 		output_fixptr(x, word1, r + 1, 32, 0);
 		output_fixptr(y, word1, r + 1 + 32, 32, 0);
@@ -604,11 +604,11 @@ int encode_secp256r1(fixed s, fixptr3 v, vector2_secp256r1 r, int compress)
 		return 1;
 	}
 
-	/* uncompress */
 	x = push1get_fixed(s);
 	y = push1get_fixed(s);
 	affine_secp256r1(s, v, x, y);
 	if (! compress) {
+		/* uncompress */
 		r[0] = 0x04;
 		output_fixptr(x, word1, r + 1, 32, 0);
 		output_fixptr(y, word1, r + 1 + 32, 32, 0);

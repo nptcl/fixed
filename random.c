@@ -164,7 +164,7 @@ static int call_fixrandom(void *ptr, size_t size)
 }
 #endif
 
-void init_seed_fixrandom(const void *ptr, size_t size)
+void seed_fixrandom(const void *ptr, size_t size)
 {
 	uint8_t x[BYTE_SHA256ENCODE];
 	struct sha32encode hash;
@@ -177,19 +177,26 @@ void init_seed_fixrandom(const void *ptr, size_t size)
 }
 
 #define SEED_SIZE_FIXRANDOM		(sizeof(fixed_random_seed) * SEED_TIMES_FIXRANDOM)
-
-void init_fixrandom(void)
+int update_fixrandom(void)
 {
 	uint8_t x[SEED_SIZE_FIXRANDOM];
 
-	if (fixed_random_enable)
-		return;
-	if (call_fixrandom(x, SEED_SIZE_FIXRANDOM)) {
-		fprintf(stderr, "call_fixrandom error.\n");
-		exit(1);
+	if (call_fixrandom(x, SEED_SIZE_FIXRANDOM))
+		return 1;
+	seed_fixrandom(x, SEED_SIZE_FIXRANDOM);
+
+	return 0;
+}
+
+void init_fixrandom(void)
+{
+	if (! fixed_random_enable) {
+		if (update_fixrandom()) {
+			fprintf(stderr, "call_fixrandom error.\n");
+			exit(1);
+		}
+		fixed_random_enable = 1;
 	}
-	init_seed_fixrandom(x, SEED_SIZE_FIXRANDOM);
-	fixed_random_enable = 1;
 }
 
 int make_fixrandom(struct fixed_random *ptr)
