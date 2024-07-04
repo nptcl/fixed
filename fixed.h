@@ -169,6 +169,10 @@ int getv_fixptr(fixptr x, fixsize size, fixnum *r);
 int setu_fixptr(fixptr x, fixsize size, unsigned v);
 int getu_fixptr(fixptr x, fixsize size, unsigned *r);
 
+unsigned logsize_fixptr(fixptr x, fixsize word);
+int logbitp_fixptr(fixptr x, fixsize word, unsigned i);
+void setbit_fixptr(fixptr x, fixsize word, int on, unsigned i);
+
 
 /*
  *  fixed

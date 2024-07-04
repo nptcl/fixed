@@ -362,53 +362,6 @@ void sub_elliptic_ed448(fixptr x, fixptr y, fixptr r, fixsize word1)
 }
 
 
-/* logical */
-unsigned logsize_fixptr(fixptr r, fixsize word)
-{
-	fixnum v;
-	unsigned x, y, size;
-
-	size = 0;
-	for (x = 0; x < word; x++) {
-		y = word - x - 1;
-		v = r[y];
-		if (v) {
-			size = y * FIXED_FULLBIT;
-			while (v) {
-				size++;
-				v >>= 1;
-			}
-			break;
-		}
-	}
-
-	return size;
-}
-
-int logbitp_fixptr(fixptr x, fixsize word, unsigned i)
-{
-	fixnum m, n;
-
-	n = i / FIXED_FULLBIT;
-	m = i % FIXED_FULLBIT;
-	return (n < word)? (((x[n] >> m) & 0x01) != 0): 0;
-}
-
-void setbit_fixptr(fixptr x, fixsize word, int on, unsigned i)
-{
-	fixnum m, n;
-
-	n = i / FIXED_FULLBIT;
-	m = i % FIXED_FULLBIT;
-	if (word <= n)
-		return;
-	if (on)
-		x[n] |= (((fixnum)1) << m);
-	else
-		x[n] &= ~(((fixnum)1) << m);
-}
-
-
 /*
  *  print3, print4
  */

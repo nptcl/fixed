@@ -102,10 +102,6 @@ void sub_elliptic_secp256r1(fixptr x, fixptr y, fixptr r, fixsize word1);
 void sub_elliptic_ed25519(fixptr x, fixptr y, fixptr r, fixsize word1);
 void sub_elliptic_ed448(fixptr x, fixptr y, fixptr r, fixsize word1);
 
-unsigned logsize_fixptr(fixptr x, fixsize word);
-int logbitp_fixptr(fixptr x, fixsize word, unsigned i);
-void setbit_fixptr(fixptr x, fixsize word, int on, unsigned i);
-
 void println3_fixptr(fixed s, fixptr3 r, FILE *file, unsigned radix);
 void println4_fixptr(fixed s, fixptr3 r, FILE *file, unsigned radix);
 int string_integer_elliptic(const char *x, void *p, int size, int reverse);
