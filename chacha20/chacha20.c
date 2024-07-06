@@ -256,18 +256,7 @@ void chacha20_encrypt(struct chacha20 *c, const void *in, void *out, size_t size
 
 void chacha20_replace(struct chacha20 *c, void *ptr, size_t size)
 {
-	uint8_t *ptr8;
-	size_t n, m, i;
-
-	n = size / 64;
-	m = size % 64;
-	ptr8 = (uint8_t *)ptr;
-	for (i = 0; i < n; i++) {
-		chacha20_block_update(c, ptr8, ptr8, 64);
-		ptr8 += 64;
-	}
-	if (m)
-		chacha20_block_update(c, ptr8, ptr8, m);
+	chacha20_encrypt(c, ptr, ptr, size);
 }
 
 
@@ -320,7 +309,7 @@ void chacha20_example(void)
 	struct chacha20 c;
 
 	init_chacha20();
-	chacha20_key(&c, "key", 5);
+	chacha20_key(&c, "key", 3);
 	chacha20_nonce(&c, "nonce", 5);
 	chacha20_encrypt(&c, "message\0", encode, 8);
 }

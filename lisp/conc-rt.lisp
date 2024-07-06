@@ -22,12 +22,10 @@
        (equalrt (cdr x) (cdr y))))
 
 (defun equalrt-array-element (x y)
-  (block nil
-    (dotimes (i (array-total-size x))
-      (unless (equalrt (row-major-aref x i)
-                       (row-major-aref y i))
-        (return nil)))
-    t))
+  (dotimes (i (array-total-size x) t)
+    (unless (equalrt (row-major-aref x i)
+                     (row-major-aref y i))
+      (return nil))))
 
 (defun equalrt-array (x y)
   (and (arrayp y)
