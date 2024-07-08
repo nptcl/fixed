@@ -27,6 +27,10 @@
     #:aes-ccm-set-l
     #:aes-ccm-set-m
     #:aes-ccm-encrypt
+    #:aes-ccm-decrypt
+
+    ;;  GCM
+    #:aes-gcm
     ))
 (in-package #:aes)
 
@@ -568,7 +572,7 @@
     (aes-ccm-state-xor state 0 input x size)
     (setf (subseq output x y) (subseq state 0 size))))
 
-(defun aes-ccm-cipher-loop (ccm input output)
+(defun aes-ccm-encrypt-loop (ccm input output)
   (let ((size (length input)))
     (multiple-value-bind (n m) (truncate size 16)
       (dotimes (i n)
@@ -578,8 +582,18 @@
         (aes-ccm-cipher-send1 ccm input n m)
         (aes-ccm-cipher-send2 ccm input n m output)))))
 
+(defun aes-ccm-decrypt-loop (ccm input output)
+  (let ((size (length input)))
+    (multiple-value-bind (n m) (truncate size 16)
+      (dotimes (i n)
+        (aes-ccm-cipher-send2 ccm input i 16 output)
+        (aes-ccm-cipher-send1 ccm output i 16))
+      (unless (zerop m)
+        (aes-ccm-cipher-send2 ccm input n m output)
+        (aes-ccm-cipher-send1 ccm output n m)))))
+
 ;;  encrypt
-(defun aes-ccm-encrypt-tag (ccm)
+(defun aes-ccm-cipher-tag (ccm)
   (let* ((first (aes-ccm-first ccm))
          (aes1 (aes-ccm-aes1 ccm))
          (state (aes-state aes1))
@@ -596,13 +610,26 @@
   (aes-ccm-mac-adata ccm)
   (aes-ccm-cipher-copy ccm)
   (aes-ccm-cipher-first ccm)
-  (aes-ccm-cipher-loop ccm input output)
-  (values output (aes-ccm-encrypt-tag ccm)))
+  (aes-ccm-encrypt-loop ccm input output)
+  (values output (aes-ccm-cipher-tag ccm)))
+
+(defun aes-ccm-decrypt (ccm input &optional output)
+  (unless output
+    (setq output (make-vector8 (length input))))
+  (aes-ccm-mac-first ccm input)
+  (aes-ccm-mac-adata ccm)
+  (aes-ccm-cipher-copy ccm)
+  (aes-ccm-cipher-first ccm)
+  (aes-ccm-decrypt-loop ccm input output)
+  (values output (aes-ccm-cipher-tag ccm)))
 
 
 ;;
 ;;  GCM
 ;;
+(defstruct aes-gcm
+  (adata nil))
+
 (defconstant +aes-gcm-multiple-r+ (ash #xE1 120))
 
 (defun aes-gcm-multiple (x y)

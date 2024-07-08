@@ -222,7 +222,7 @@
 (defmacro defvector16 (name &rest args)
   `(defconstant ,name (test-genarray ,@args)))
 
-(defmacro deftest-aes128-ccm (name const)
+(defmacro deftest-aes128-ccm-encrypt (name const)
   (let ((n (symbol-value const)))
     `(deftest ,name
        (let ((ccm (make-aes-ccm-128))
@@ -236,9 +236,23 @@
        ,(apply #'test-genarray (nth 4 n))
        ,(apply #'test-genarray (nth 5 n)))))
 
+(defmacro deftest-aes128-ccm-decrypt (name const)
+  (let ((n (symbol-value const)))
+    `(deftest ,name
+       (let ((ccm (make-aes-ccm-128))
+             (input ,(apply #'test-genarray (nth 4 n))))
+         (aes-ccm-set-l ccm 2)
+         (setf (aes-ccm-adata ccm) ,(apply #'test-genarray (nth 2 n)))
+         (setf (aes-ccm-key ccm) ,(apply #'test-genarray (nth 0 n)))
+         (setf (aes-ccm-nonce ccm) ,(apply #'test-genarray (nth 1 n)))
+         (aes-ccm-setkey ccm)
+         (aes-ccm-decrypt ccm input))
+       ,(apply #'test-genarray (nth 3 n))
+       ,(apply #'test-genarray (nth 5 n)))))
+
 
 ;;  1
-(defconstant test-aes-ccm-128.1
+(defconstant aes128-ccm-test.1
   '(("C0 C1 C2 C3  C4 C5 C6 C7  C8 C9 CA CB  CC CD CE CF")  ;; key
     ("00 00 00 03  02 01 00 A0  A1 A2 A3 A4  A5")  ;; nonce
     ("00 01 02 03  04 05 06 07")  ;; adata
@@ -250,11 +264,17 @@
      "6D 5F 6B 61  DA C3 84")
     ("17 E8 D1 2C  FD F9 26 E0")))  ;; tag
 
-(deftest-aes128-ccm aes-ccm-128.1 test-aes-ccm-128.1)
+(deftest-aes128-ccm-encrypt
+  aes128-ccm-encrypt.1
+  aes128-ccm-test.1)
+
+(deftest-aes128-ccm-decrypt
+  aes128-ccm-decrypt.1
+  aes128-ccm-test.1)
 
 
 ;;  2
-(defconstant test-aes-ccm-128.2
+(defconstant aes128-ccm-test.2
   '(("C0 C1 C2 C3  C4 C5 C6 C7  C8 C9 CA CB  CC CD CE CF")  ;; key
     ("00 00 00 04  03 02 01 A0  A1 A2 A3 A4  A5")  ;; nonce
     ("00 01 02 03  04 05 06 07")  ;; adata
@@ -266,11 +286,17 @@
      "CC 15 C4 39  C9 E4 3A 3B")
     ("A0 91 D5 6E  10 40 09 16")))
 
-(deftest-aes128-ccm aes-ccm-138.2 test-aes-ccm-128.2)
+(deftest-aes128-ccm-encrypt
+  aes128-ccm-encrypt.2
+  aes128-ccm-test.2)
+
+(deftest-aes128-ccm-decrypt
+  aes128-ccm-decrypt.2
+  aes128-ccm-test.2)
 
 
-;;  2
-(defconstant test-aes-ccm-128.3
+;;  3
+(defconstant aes128-ccm-test.3
   '(("C0 C1 C2 C3  C4 C5 C6 C7  C8 C9 CA CB  CC CD CE CF")  ;; key
     ("00 00 00 05  04 03 02 A0  A1 A2 A3 A4  A5")
     ("00 01 02 03  04 05 06 07")  ;; adata
@@ -284,7 +310,13 @@
      "57")
     ("4A DA A7 6F  BD 9F B0 C5")))
 
-(deftest-aes128-ccm aes-ccm-128.3 test-aes-ccm-128.3)
+(deftest-aes128-ccm-encrypt
+  aes128-ccm-encrypt.3
+  aes128-ccm-test.3)
+
+(deftest-aes128-ccm-decrypt
+  aes128-ccm-decrypt.3
+  aes128-ccm-test.3)
 
 
 ;;
