@@ -74,6 +74,17 @@ void string_sha512encode(const char *, void *);
 
 
 /*
+ *  SHA-2: SHA-384
+ */
+void init_sha384encode(struct sha64encode *);
+void byte_sha384encode(struct sha64encode *, uint8_t);
+void read_sha384encode(struct sha64encode *, const void *, size_t);
+void calc_sha384encode(struct sha64encode *, void *);
+void sequence_sha384encode(const void *, size_t, void *);
+void string_sha384encode(const char *, void *);
+
+
+/*
  *  SHA-3
  */
 enum tail_sha3encode {

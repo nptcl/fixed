@@ -171,15 +171,23 @@ static void aes_shift_rows2(struct aes *a)
 /*
  *  mix_columus
  */
+#define aes_xor(n1,n2,n3,n4, r1,r2,r3,r4) \
+	aes_xor_##n1(r1) ^ aes_xor_##n2(r2) ^ aes_xor_##n3(r3) ^ aes_xor_##n4(r4);
+
 #define aes_xtime(x) (0xFF & ((0x80 & (x))? (((x) << 1) ^ 0x1B): ((x) << 1)))
 
-static uint8_t aes_mul_02(uint8_t x)
+/* 0001 */
+#define aes_xor___(x) (x)
+
+static uint8_t aes_xor_02(uint8_t x)
 {
+	/* 0010 */
 	return aes_xtime(x);
 }
 
-static uint8_t aes_mul_03(uint8_t x)
+static uint8_t aes_xor_03(uint8_t x)
 {
+	/* 0011 */
 	return x ^ aes_xtime(x);
 }
 
@@ -194,47 +202,14 @@ static void aes_mix_columns1(struct aes *a)
 		r2 = aes_state(state, 1, y);
 		r3 = aes_state(state, 2, y);
 		r4 = aes_state(state, 3, y);
-		aes_state(state, 0, y) = aes_mul_02(r1) ^ aes_mul_03(r2) ^ r3 ^ r4;
-		aes_state(state, 1, y) = r1 ^ aes_mul_02(r2) ^ aes_mul_03(r3) ^ r4;
-		aes_state(state, 2, y) = r1 ^ r2 ^ aes_mul_02(r3) ^ aes_mul_03(r4);
-		aes_state(state, 3, y) = aes_mul_03(r1) ^ r2 ^ r3 ^ aes_mul_02(r4);
+		aes_state(state, 0, y) = aes_xor(02,03,__,__, r1,r2,r3,r4);
+		aes_state(state, 1, y) = aes_xor(__,02,03,__, r1,r2,r3,r4);
+		aes_state(state, 2, y) = aes_xor(__,__,02,03, r1,r2,r3,r4);
+		aes_state(state, 3, y) = aes_xor(03,__,__,02, r1,r2,r3,r4);
 	}
 }
 
-static uint8_t aes_mul_0e(uint8_t x)
-{
-	uint8_t y, z;
-
-	/* 1110 */
-	x = aes_xtime(x);
-	y = aes_xtime(x);
-	z = aes_xtime(y);
-	return x ^ y ^ z;
-}
-
-static uint8_t aes_mul_0b(uint8_t x)
-{
-	uint8_t y, z;
-
-	/* 1011 */
-	y = aes_xtime(x);
-	z = aes_xtime(y);
-	z = aes_xtime(z);
-	return x ^ y ^ z;
-}
-
-static uint8_t aes_mul_0d(uint8_t x)
-{
-	uint8_t y, z;
-
-	/* 1101 */
-	y = aes_xtime(x);
-	y = aes_xtime(y);
-	z = aes_xtime(y);
-	return x ^ y ^ z;
-}
-
-static uint8_t aes_mul_09(uint8_t x)
+static uint8_t aes_xor_09(uint8_t x)
 {
 	uint8_t y;
 
@@ -245,8 +220,38 @@ static uint8_t aes_mul_09(uint8_t x)
 	return x ^ y;
 }
 
-#define aes_mul(n1,n2,n3,n4, r1,r2,r3,r4) \
-	aes_mul_##n1(r1) ^ aes_mul_##n2(r2) ^ aes_mul_##n3(r3) ^ aes_mul_##n4(r4);
+static uint8_t aes_xor_0b(uint8_t x)
+{
+	uint8_t y, z;
+
+	/* 1011 */
+	y = aes_xtime(x);
+	z = aes_xtime(y);
+	z = aes_xtime(z);
+	return x ^ y ^ z;
+}
+
+static uint8_t aes_xor_0d(uint8_t x)
+{
+	uint8_t y, z;
+
+	/* 1101 */
+	y = aes_xtime(x);
+	y = aes_xtime(y);
+	z = aes_xtime(y);
+	return x ^ y ^ z;
+}
+
+static uint8_t aes_xor_0e(uint8_t x)
+{
+	uint8_t y, z;
+
+	/* 1110 */
+	x = aes_xtime(x);
+	y = aes_xtime(x);
+	z = aes_xtime(y);
+	return x ^ y ^ z;
+}
 
 static void aes_mix_columns2(struct aes *a)
 {
@@ -259,10 +264,10 @@ static void aes_mix_columns2(struct aes *a)
 		r2 = aes_state(state, 1, y);
 		r3 = aes_state(state, 2, y);
 		r4 = aes_state(state, 3, y);
-		aes_state(state, 0, y) = aes_mul(0e,0b,0d,09, r1,r2,r3,r4);
-		aes_state(state, 1, y) = aes_mul(09,0e,0b,0d, r1,r2,r3,r4);
-		aes_state(state, 2, y) = aes_mul(0d,09,0e,0b, r1,r2,r3,r4);
-		aes_state(state, 3, y) = aes_mul(0b,0d,09,0e, r1,r2,r3,r4);
+		aes_state(state, 0, y) = aes_xor(0e,0b,0d,09, r1,r2,r3,r4);
+		aes_state(state, 1, y) = aes_xor(09,0e,0b,0d, r1,r2,r3,r4);
+		aes_state(state, 2, y) = aes_xor(0d,09,0e,0b, r1,r2,r3,r4);
+		aes_state(state, 3, y) = aes_xor(0b,0d,09,0e, r1,r2,r3,r4);
 	}
 }
 

@@ -811,7 +811,7 @@ static inline uint64_t sha512_w(const uint64_t *w, int s)
 	a = t1 + t2; \
 }
 
-static void next_sha512encode(struct sha64encode *ptr)
+static void next_sha64encode(struct sha64encode *ptr)
 {
 	int i, s;
 	uint64_t a, b, c, d, e, f, g, h, t1, t2;
@@ -859,7 +859,7 @@ static void next_sha512encode(struct sha64encode *ptr)
 
 void byte_sha512encode(struct sha64encode *ptr, uint8_t v)
 {
-	byte_sha64encode(next_sha512encode, ptr, v);
+	byte_sha64encode(next_sha64encode, ptr, v);
 }
 
 void read_sha512encode(struct sha64encode *ptr, const void *pvoid, size_t size)
@@ -869,12 +869,12 @@ void read_sha512encode(struct sha64encode *ptr, const void *pvoid, size_t size)
 
 void finish_sha512encode(struct sha64encode *ptr)
 {
-	finish_sha64encode(next_sha512encode, ptr);
+	finish_sha64encode(next_sha64encode, ptr);
 }
 
 void calc_sha512encode(struct sha64encode *ptr, void *pvoid)
 {
-	calc_sha64encode(next_sha512encode, ptr, pvoid, 8);
+	calc_sha64encode(next_sha64encode, ptr, pvoid, 8);
 }
 
 void sequence_sha512encode(const void *from, size_t len, void *result)
@@ -889,6 +889,56 @@ void sequence_sha512encode(const void *from, size_t len, void *result)
 void string_sha512encode(const char *from, void *result)
 {
 	sequence_sha512encode(from, strlen(from), result);
+}
+
+
+/*
+ *  SHA-2: SHA-384
+ */
+static const uint64_t sha384_h[8] = {
+	0xcbbb9d5dc1059ed8ULL, 0x629a292a367cd507ULL,
+	0x9159015a3070dd17ULL, 0x152fecd8f70e5939ULL,
+	0x67332667ffc00b31ULL, 0x8eb44a8768581511ULL,
+	0xdb0c2e0d64f98fa7ULL, 0x47b5481dbefa4fa4ULL
+};
+
+void init_sha384encode(struct sha64encode *ptr)
+{
+	init_sha64encode(ptr, sha384_h, BYTE_SHA384ENCODE);
+}
+
+void byte_sha384encode(struct sha64encode *ptr, uint8_t v)
+{
+	byte_sha64encode(next_sha64encode, ptr, v);
+}
+
+void read_sha384encode(struct sha64encode *ptr, const void *pvoid, size_t size)
+{
+	read_sha64encode(byte_sha384encode, ptr, pvoid, size);
+}
+
+void finish_sha384encode(struct sha64encode *ptr)
+{
+	finish_sha64encode(next_sha64encode, ptr);
+}
+
+void calc_sha384encode(struct sha64encode *ptr, void *pvoid)
+{
+	calc_sha64encode(next_sha64encode, ptr, pvoid, 6);
+}
+
+void sequence_sha384encode(const void *from, size_t len, void *result)
+{
+	struct sha64encode sha384;
+
+	init_sha384encode(&sha384);
+	read_sha384encode(&sha384, from, len);
+	calc_sha384encode(&sha384, result);
+}
+
+void string_sha384encode(const char *from, void *result)
+{
+	sequence_sha384encode(from, strlen(from), result);
 }
 
 
@@ -984,8 +1034,8 @@ static const uint64_t rc_sha3encode[24] = {
 	} \
 	\
 	/* rho, pi */ \
-	for (x = 0; x < 5; x++) { \
-		for (y = 0; y < 5; y++) { \
+	for (y = 0; y < 5; y++) { \
+		for (x = 0; x < 5; x++) { \
 			xy = (2 * x + 3 * y) % 5; \
 			p = sha3_xy(x, y); \
 			q = sha3_xy(y, xy); \

@@ -65,6 +65,30 @@
 
 
 ;;
+;;  sha384encode
+;;
+(defun sha384encode-equal (sha x y)
+  (dotimes (i (length x))
+    (byte-sha384encode sha (char-code (char x i))))
+  (let* ((a (calc-sha384encode sha))
+         (b (sha-string a)))
+    (unless (equalp b y)
+      (format t "ERROR: ~A, ~A, ~A~%" x y b)))
+  (init-sha384encode sha))
+
+(defun main-sha384encode ()
+  (let ((sha (make-sha384encode))
+        (file #p"hash.sha384"))
+    (format t "Test: ~A~%" file)
+    (with-open-file (input file)
+      (dolist (str (read-lines input))
+        (let* ((p (position #\Space str))
+               (x (subseq str 0 p))
+               (y (subseq str (1+ p))))
+          (sha384encode-equal sha x y))))))
+
+
+;;
 ;;  sha3encode
 ;;
 (defun sha3encode-equal (sha size x y)
@@ -103,5 +127,6 @@
 ;;
 (main-sha256encode)
 (main-sha512encode)
+(main-sha384encode)
 (main-sha3encode)
 

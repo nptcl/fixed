@@ -134,6 +134,11 @@ static int test_sha256str(const char *x, const char *y)
 	return test_hash_string(x, y, BYTE_SHA256ENCODE, string_sha256encode);
 }
 
+static int test_sha384str(const char *x, const char *y)
+{
+	return test_hash_string(x, y, BYTE_SHA384ENCODE, string_sha384encode);
+}
+
 static int test_sha512str(const char *x, const char *y)
 {
 	return test_hash_string(x, y, BYTE_SHA512ENCODE, string_sha512encode);
@@ -166,6 +171,10 @@ static int test_hash_call(void)
 	test(test_sha256str("",
 				"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
 			"sha256.1");
+	test(test_sha384str("",
+				"38b060a751ac96384cd9327eb1b1e36a21fdb71114be07434c0cc7bf63f6e1da"
+				"274edebfe76f65fbd51ad2f14898b95b"),
+			"sha384.1");
 	test(test_sha512str("",
 				"cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce"
 				"47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e"),
@@ -251,6 +260,11 @@ static int test_hash_sha256(void)
 	return test_hash_read("hash.sha256", BYTE_SHA256ENCODE, string_sha256encode);
 }
 
+static int test_hash_sha384(void)
+{
+	return test_hash_read("hash.sha384", BYTE_SHA384ENCODE, string_sha384encode);
+}
+
 static int test_hash_sha512(void)
 {
 	return test_hash_read("hash.sha512", BYTE_SHA512ENCODE, string_sha512encode);
@@ -283,6 +297,7 @@ static int test_hash(void)
 	TestCall(test_hash_md5);
 	TestCall(test_hash_sha1);
 	TestCall(test_hash_sha256);
+	TestCall(test_hash_sha384);
 	TestCall(test_hash_sha512);
 	TestCall(test_hash_sha3_256);
 	TestCall(test_hash_sha3_512);

@@ -24,6 +24,14 @@ for i in `cat key`; do
 done > hash.sha256
 
 
+# sha384
+echo "sha384"
+for i in `cat key`; do
+  hash=`echo -n "$i" | sha384sum --quiet`
+  echo "$i $hash"
+done > hash.sha384
+
+
 # sha512
 echo "sha512"
 for i in `cat key`; do

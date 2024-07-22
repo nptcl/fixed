@@ -23,6 +23,15 @@
     #:big-endian-sha512encode
     #:calc-sha512encode
 
+    ;;  sha384encode
+    #:make-sha384encode
+    #:init-sha384encode
+    #:byte-sha384encode
+    #:read-sha384encode
+    #:little-endian-sha384encode
+    #:big-endian-sha384encode
+    #:calc-sha384encode
+
     ;;  sha3encode
     #:make-sha3-224-encode
     #:make-sha3-256-encode
@@ -60,7 +69,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;  SHA-2: sha32encode
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defconstant +sha32-k+
+(defparameter +sha32-k+
   #(#x428a2f98 #x71374491 #xb5c0fbcf #xe9b5dba5
     #x3956c25b #x59f111f1 #x923f82a4 #xab1c5ed5
     #xd807aa98 #x12835b01 #x243185be #x550c7dc3
@@ -116,7 +125,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;  SHA-2: 256 bit
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defconstant +sha256-h+
+(defparameter +sha256-h+
   #(#x6a09e667 #xbb67ae85 #x3c6ef372 #xa54ff53a
     #x510e527f #x9b05688c #x1f83d9ab #x5be0cd19))
 
@@ -276,7 +285,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;  SHA-2: sha64encode
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defconstant +sha64-k+
+(defparameter +sha64-k+
   #(#x428a2f98d728ae22 #x7137449123ef65cd #xb5c0fbcfec4d3b2f #xe9b5dba58189dbbc
     #x3956c25bf348b538 #x59f111f1b605d019 #x923f82a4af194f9b #xab1c5ed5da6d8118
     #xd807aa98a3030242 #x12835b0145706fbe #x243185be4ee4b28c #x550c7dc3d5ffb4e2
@@ -332,26 +341,18 @@
   (sha64-mask
     (logior (ash x (- 64 n)) (ash x (- n)))))
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;  SHA-2: 512 bit
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defconstant +sha512-h+
-  #(#x6a09e667f3bcc908 #xbb67ae8584caa73b #x3c6ef372fe94f82b #xa54ff53a5f1d36f1
-    #x510e527fade682d1 #x9b05688c2b3e6c1f #x1f83d9abfb41bd6b #x5be0cd19137e2179))
-
-(defun make-sha512encode ()
+(defun make-sha64encode-array (array)
   (let* ((sha (make-sha64encode))
          (array-h (sha64encode-h sha)))
     (dotimes (i 8)
-      (setf (aref array-h i) (aref +sha512-h+ i)))
+      (setf (aref array-h i) (aref array i)))
     sha))
 
-(defun init-sha512encode (sha)
+(defun init-sha64encode (sha array)
   (let ((array-h (sha64encode-h sha))
         (array-w (sha64encode-w sha)))
     (dotimes (i 8)
-      (setf (aref array-h i) (aref +sha512-h+ i)))
+      (setf (aref array-h i) (aref array i)))
     (sha64-clear-w array-w)
     (setf (sha64encode-index sha) 0)
     (setf (sha64encode-size sha) 0))
@@ -373,7 +374,7 @@
   (declare (type sha64fixnum x))
   (logxor (sha64-rotr x 19) (sha64-rotr x 61) (ash x -6)))
 
-(defun sha512-w (array-w s)
+(defun sha64-w (array-w s)
   (setf (aref array-w s)
         (sha64-add
           (sigma64-lower-1 (aref array-w (logand (+ s 14) #x0F)))
@@ -381,25 +382,25 @@
           (sigma64-lower-0 (aref array-w (logand (+ s 1) #x0F)))
           (aref array-w s))))
 
-(defmacro sha512-x (e f g h i ws)
+(defmacro sha64-x (e f g h i ws)
   `(sha64-add ,h
               (sigma64-upper-1 ,e)
               (sha64-ch ,e ,f ,g)
               (aref +sha64-k+ ,i)
               ,ws))
 
-(defmacro sha512-y (a b c)
+(defmacro sha64-y (a b c)
   `(sha64-add (sigma64-upper-0 ,a)
               (sha64-maj ,a ,b ,c)))
 
-(defmacro sha512-abcdefgh (a b c d e f g h x y)
+(defmacro sha64-abcdefgh (a b c d e f g h x y)
   `(setq ,h ,g ,g ,f ,f ,e ,e (sha64-add ,d ,x)
          ,d ,c ,c ,b ,b ,a ,a (sha64-add ,x ,y)))
 
 (defun sha64-incf (array-h index value)
   (setf (aref array-h index) (sha64-add (aref array-h index) value)))
 
-(defun next-sha512encode (sha)
+(defun next-sha64encode (sha)
   (let* ((array-h (sha64encode-h sha))
          (array-w (sha64encode-w sha))
          (a (aref array-h 0))
@@ -415,17 +416,17 @@
     ;;  0 - 15
     (loop for i from 0 below 16
           do (let* ((ws (aref array-w i))
-                    (x (sha512-x e f g h i ws))
-                    (y (sha512-y a b c)))
-               (sha512-abcdefgh a b c d e f g h x y)))
+                    (x (sha64-x e f g h i ws))
+                    (y (sha64-y a b c)))
+               (sha64-abcdefgh a b c d e f g h x y)))
 
     ;;  16 - 79
     (loop for i from 16 below 80
           do (let* ((s (logand i #x0F))
-                    (ws (sha512-w array-w s))
-                    (x (sha512-x e f g h i ws))
-                    (y (sha512-y a b c)))
-               (sha512-abcdefgh a b c d e f g h x y)))
+                    (ws (sha64-w array-w s))
+                    (x (sha64-x e f g h i ws))
+                    (y (sha64-y a b c)))
+               (sha64-abcdefgh a b c d e f g h x y)))
 
     ;;  add
     (sha64-incf array-h 0 a)
@@ -440,7 +441,7 @@
     ;;  clear-w
     (sha64-clear-w array-w)))
 
-(defun byte-sha512encode (sha v)
+(defun byte-sha64encode (sha v)
   (declare (type sha64encode sha)
            (type (unsigned-byte 8) v))
   (let ((w (sha64encode-w sha))
@@ -452,45 +453,109 @@
 
     ;;  next
     (unless (< i 128)
-      (next-sha512encode sha)
+      (next-sha64encode sha)
       (setq i 0))
     (setf (sha64encode-index sha) i)
     (incf (sha64encode-size sha) 1)))
 
-(defun read-sha512encode (sha v)
-  (map nil (lambda (x) (byte-sha512encode sha x)) v))
+(defun read-sha64encode (sha v)
+  (map nil (lambda (x) (byte-sha64encode sha x)) v))
 
-(defun little-endian-sha512encode (sha x size)
+(defun little-endian-sha64encode (sha x size)
   (dotimes (i size)
-    (byte-sha512encode sha (ldb (byte 8 (* i 8)) x))))
+    (byte-sha64encode sha (ldb (byte 8 (* i 8)) x))))
 
-(defun big-endian-sha512encode (sha x size)
+(defun big-endian-sha64encode (sha x size)
   (dotimes (k size)
     (let ((i (- size k 1)))
-      (byte-sha512encode sha (ldb (byte 8 (* i 8)) x)))))
+      (byte-sha64encode sha (ldb (byte 8 (* i 8)) x)))))
 
-(defun finish-sha512encode (sha)
+(defun finish-sha64encode (sha)
   (let ((size (* (sha64encode-size sha) 8)))
-    (byte-sha512encode sha #x80)
+    (byte-sha64encode sha #x80)
     (when (< (- 128 16) (sha64encode-index sha))
-      (next-sha512encode sha))
+      (next-sha64encode sha))
     (let ((w (sha64encode-w sha)))
       (setf (aref w (- 16 2)) (sha64-mask (ash size -64)))
       (setf (aref w (- 16 1)) (sha64-mask size))
-      (next-sha512encode sha))))
+      (next-sha64encode sha))))
 
-(defun calc-sha512encode (sha &optional a)
-  (finish-sha512encode sha)
+(defun calc-sha64encode (sha a size)
+  (finish-sha64encode sha)
   (unless a
-    (setq a (make-array8 64)))
+    (setq a (make-array8 (* size 8))))
   (let ((array-h (sha64encode-h sha)) (k 0))
-    (dotimes (x 8)
+    (dotimes (x size)
       (let ((v (aref array-h x)))
         (dotimes (y 8)
           (let ((z (- 8 y 1)))
             (setf (aref a k) (logand (ash v (- (* z 8))) #xFF))
             (incf k 1)))))
     a))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  SHA-2: 512 bit
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defparameter +sha512-h+
+  #(#x6a09e667f3bcc908 #xbb67ae8584caa73b #x3c6ef372fe94f82b #xa54ff53a5f1d36f1
+    #x510e527fade682d1 #x9b05688c2b3e6c1f #x1f83d9abfb41bd6b #x5be0cd19137e2179))
+
+(defun make-sha512encode ()
+  (make-sha64encode-array +sha512-h+))
+
+(defun init-sha512encode (sha)
+  (init-sha64encode sha +sha512-h+))
+
+(defun byte-sha512encode (sha v)
+  (byte-sha64encode sha v))
+
+(defun read-sha512encode (sha v)
+  (read-sha64encode sha v))
+
+(defun little-endian-sha512encode (sha x size)
+  (little-endian-sha64encode sha x size))
+
+(defun big-endian-sha512encode (sha x size)
+  (big-endian-sha64encode sha x size))
+
+(defun finish-sha512encode (sha)
+  (finish-sha64encode sha))
+
+(defun calc-sha512encode (sha &optional a)
+  (calc-sha64encode sha a 8))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  SHA-2: 384 bit
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defparameter +sha384-h+
+  #(#xcbbb9d5dc1059ed8 #x629a292a367cd507 #x9159015a3070dd17 #x152fecd8f70e5939
+    #x67332667ffc00b31 #x8eb44a8768581511 #xdb0c2e0d64f98fa7 #x47b5481dbefa4fa4))
+
+(defun make-sha384encode ()
+  (make-sha64encode-array +sha384-h+))
+
+(defun init-sha384encode (sha)
+  (init-sha64encode sha +sha384-h+))
+
+(defun byte-sha384encode (sha v)
+  (byte-sha64encode sha v))
+
+(defun read-sha384encode (sha v)
+  (read-sha64encode sha v))
+
+(defun little-endian-sha384encode (sha x size)
+  (little-endian-sha64encode sha x size))
+
+(defun big-endian-sha384encode (sha x size)
+  (big-endian-sha64encode sha x size))
+
+(defun finish-sha384encode (sha)
+  (finish-sha64encode sha))
+
+(defun calc-sha384encode (sha &optional a)
+  (calc-sha64encode sha a 6))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -505,14 +570,14 @@
   (dbyte 0)
   tail)
 
-(defconstant +sha3-rho+
+(defparameter +sha3-rho+
   #(0   1   62  28  27
     36  44  6   55  20
     3   10  43  25  39
     41  45  15  21  8
     18  2   61  56  14))
 
-(defconstant +sha3-rc+
+(defparameter +sha3-rc+
   #(#x0000000000000001 #x0000000000008082
     #x800000000000808A #x8000000080008000
     #x000000000000808B #x0000000080000001
@@ -549,8 +614,8 @@
           (let ((i (sha3-xy x y)))
             (setf (aref a i) (logxor (aref a i) v))))))
     ;;  rho, pi
-    (dotimes (x 5)
-      (dotimes (y 5)
+    (dotimes (y 5)
+      (dotimes (x 5)
         (let* ((xy (mod (+ (* 2 x) (* 3 y)) 5))
                (p (sha3-xy x y))
                (q (sha3-xy y xy))

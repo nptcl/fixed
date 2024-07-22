@@ -3,6 +3,7 @@
   (:export
     ;;  AES
     #:aes
+    #:aes-p
     #:make-aes128
     #:make-aes192
     #:make-aes256
@@ -16,6 +17,7 @@
 
     ;;  CCM
     #:aes-ccm
+    #:aes-ccm-p
     #:aes-ccm-key
     #:aes-ccm-nonce
     #:aes-ccm-adata
@@ -31,19 +33,59 @@
 
     ;;  GCM
     #:aes-gcm
+    #:aes-gcm-p
+    #:aes-gcm-key
+    #:aes-gcm-nonce
+    #:aes-gcm-adata
+    #:make-aes-gcm-128
+    #:make-aes-gcm-192
+    #:make-aes-gcm-256
+    #:aes-gcm-setkey
+    #:aes-gcm-encrypt
+    #:aes-gcm-decrypt
     ))
 (in-package #:aes)
 
-(defconstant +aes-size+ 16)
-(defconstant +aes-key+ 32)
-(defconstant +aes-nb+ 4)
-(defconstant +aes-word+ (* +aes-nb+ 15))
+(defun integer-big-vector (v size)
+  (let ((a (make-array size :element-type '(unsigned-byte 8))))
+    (dotimes (i size)
+      (let ((k (- size i 1)))
+        (setf (aref a i) (ldb (byte 8 (* k 8)) v))))
+    a))
+
+(defun vector-big-integer (v &key (start 0) end)
+  (unless end
+    (setq end (length v)))
+  (let ((r 0) (k (- end start 1)))
+    (loop for i from start below end
+          do
+          (setq r (logior r (ash (aref v i) (* k 8))))
+          (decf k 1))
+    r))
+
+(defun setf-integer-big-vector (a v &key (start 0) end)
+  (unless end
+    (setq end (length a)))
+  (let ((size (- end start)))
+    (dotimes (i size)
+      (let ((x (+ start i))
+            (y (- size i 1)))
+        (setf (aref a x) (ldb (byte 8 (* y 8)) v))))))
 
 (defun make-vector8 (n)
   (make-array n :element-type '(unsigned-byte 8) :initial-element 0))
 
 (defun make-vector32 (n)
   (make-array n :element-type '(unsigned-byte 32) :initial-element 0))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  AES
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defconstant +aes-size+ 16)
+(defconstant +aes-key+ 32)
+(defconstant +aes-nb+ 4)
+(defconstant +aes-word+ (* +aes-nb+ 15))
 
 (defstruct aes
   (key (make-vector8 +aes-key+))
@@ -190,15 +232,28 @@
 ;;
 ;;  mix-columns
 ;;
+(defmacro mix-xor (a b c d r1 r2 r3 r4)
+  (flet ((mix-symb (x) (intern (format nil "~A-~2,'0X" 'aes-xor x))))
+    `(logxor (,(mix-symb a) ,r1)
+             (,(mix-symb b) ,r2)
+             (,(mix-symb c) ,r3)
+             (,(mix-symb d) ,r4))))
+
 (defun xtime (x)
   (if (logbitp 7 x)
     (logand #xFF (logxor (ash x 1) #x1B))
     (logand #xFF (ash x 1))))
 
-(defun mul-x02 (x)
+(defmacro aes-xor--- (x)
+  ;;  0001
+  x)
+
+(defun aes-xor-02 (x)
+  ;;  0010
   (xtime x))
 
-(defun mul-x03 (x)
+(defun aes-xor-03 (x)
+  ;;  0011
   (logxor x (xtime x)))
 
 (defun mix-columns1 (a)
@@ -208,47 +263,38 @@
             (r2 (get-state state 1 y))
             (r3 (get-state state 2 y))
             (r4 (get-state state 3 y)))
-        (setf (get-state state 0 y) (logxor (mul-x02 r1) (mul-x03 r2) r3 r4))
-        (setf (get-state state 1 y) (logxor r1 (mul-x02 r2) (mul-x03 r3) r4))
-        (setf (get-state state 2 y) (logxor r1 r2 (mul-x02 r3) (mul-x03 r4)))
-        (setf (get-state state 3 y) (logxor (mul-x03 r1) r2 r3 (mul-x02 r4)))))))
+        (setf (get-state state 0 y) (mix-xor 02 03 -- --  r1 r2 r3 r4))
+        (setf (get-state state 1 y) (mix-xor -- 02 03 --  r1 r2 r3 r4))
+        (setf (get-state state 2 y) (mix-xor -- -- 02 03  r1 r2 r3 r4))
+        (setf (get-state state 3 y) (mix-xor 03 -- -- 02  r1 r2 r3 r4))))))
 
-(defun mul-x0e (x &aux y z)
-  ;;  1110
-  (setq x (xtime x))
-  (setq y (xtime x))
-  (setq z (xtime y))
-  (logxor x y z))
-
-(defun mul-x0b (x &aux y z)
-  ;;  1011
-  (setq y (xtime x))
-  (setq z (xtime y))
-  (setq z (xtime z))
-  (logxor x y z))
-
-(defun mul-x0d (x &aux y z)
-  ;;  1101
-  (setq y (xtime x))
-  (setq y (xtime y))
-  (setq z (xtime y))
-  (logxor x y z))
-
-(defun mul-x09 (x &aux y)
+(defun aes-xor-09 (x &aux y)
   ;;  1001
   (setq y (xtime x))
   (setq y (xtime y))
   (setq y (xtime y))
   (logxor x y))
 
-(defun symb (&rest args)
-  (intern (apply #'concatenate 'string (mapcar #'princ-to-string args))))
+(defun aes-xor-0b (x &aux y z)
+  ;;  1011
+  (setq y (xtime x))
+  (setq z (xtime y))
+  (setq z (xtime z))
+  (logxor x y z))
 
-(defmacro mix-mul (a b c d r1 r2 r3 r4)
-  `(logxor (,(symb 'mul- a) ,r1)
-           (,(symb 'mul- b) ,r2)
-           (,(symb 'mul- c) ,r3)
-           (,(symb 'mul- d) ,r4)))
+(defun aes-xor-0d (x &aux y z)
+  ;;  1101
+  (setq y (xtime x))
+  (setq y (xtime y))
+  (setq z (xtime y))
+  (logxor x y z))
+
+(defun aes-xor-0e (x &aux y z)
+  ;;  1110
+  (setq x (xtime x))
+  (setq y (xtime x))
+  (setq z (xtime y))
+  (logxor x y z))
 
 (defun mix-columns2 (a)
   (let ((state (aes-state a)))
@@ -257,10 +303,10 @@
             (r2 (get-state state 1 y))
             (r3 (get-state state 2 y))
             (r4 (get-state state 3 y)))
-        (setf (get-state state 0 y) (mix-mul x0e x0b x0d x09  r1 r2 r3 r4))
-        (setf (get-state state 1 y) (mix-mul x09 x0e x0b x0d  r1 r2 r3 r4))
-        (setf (get-state state 2 y) (mix-mul x0d x09 x0e x0b  r1 r2 r3 r4))
-        (setf (get-state state 3 y) (mix-mul x0b x0d x09 x0e  r1 r2 r3 r4))))))
+        (setf (get-state state 0 y) (mix-xor 0e 0b 0d 09  r1 r2 r3 r4))
+        (setf (get-state state 1 y) (mix-xor 09 0e 0b 0d  r1 r2 r3 r4))
+        (setf (get-state state 2 y) (mix-xor 0d 09 0e 0b  r1 r2 r3 r4))
+        (setf (get-state state 3 y) (mix-xor 0b 0d 09 0e  r1 r2 r3 r4))))))
 
 
 ;;
@@ -373,29 +419,9 @@
     (add-round-key a 0)))
 
 
-;;
-;;  endian
-;;
-(defun integer-big-vector (v size)
-  (let ((a (make-array size :element-type '(unsigned-byte 8))))
-    (dotimes (i size)
-      (let ((k (- size i 1)))
-        (setf (aref a i) (ldb (byte 8 (* k 8)) v))))
-    a))
-
-(defun setf-integer-big-vector (a v &key (start 0) end)
-  (unless end
-    (setq end (length a)))
-  (let ((size (- end start)))
-    (dotimes (i size)
-      (let ((x (+ start i))
-            (y (- size i 1)))
-        (setf (aref a x) (ldb (byte 8 (* y 8)) v))))))
-
-
-;;
-;;  CCM
-;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  AES-CCM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defstruct aes-ccm
   (aes1 (make-aes128))
   (aes2 (make-aes128))
@@ -593,54 +619,215 @@
         (aes-ccm-cipher-send1 ccm output n m)))))
 
 ;;  encrypt
-(defun aes-ccm-cipher-tag (ccm)
+(defun aes-ccm-tag (ccm)
   (let* ((first (aes-ccm-first ccm))
          (aes1 (aes-ccm-aes1 ccm))
          (state (aes-state aes1))
-         (size (aes-ccm-size-m ccm))
-         (tag (make-vector8 size)))
-    (dotimes (i size)
+         (size-m (aes-ccm-size-m ccm))
+         (tag (make-vector8 size-m)))
+    (dotimes (i size-m)
       (setf (aref tag i) (logxor (aref first i) (aref state i))))
     tag))
 
-(defun aes-ccm-encrypt (ccm input &optional output)
+(defun aes-ccm-cipher (ccm input output)
   (unless output
     (setq output (make-vector8 (length input))))
   (aes-ccm-mac-first ccm input)
   (aes-ccm-mac-adata ccm)
   (aes-ccm-cipher-copy ccm)
   (aes-ccm-cipher-first ccm)
-  (aes-ccm-encrypt-loop ccm input output)
-  (values output (aes-ccm-cipher-tag ccm)))
+  output)
+
+(defun aes-ccm-encrypt (ccm input &optional output)
+  (let ((output (aes-ccm-cipher ccm input output)))
+    (aes-ccm-encrypt-loop ccm input output)
+    (values output (aes-ccm-tag ccm))))
 
 (defun aes-ccm-decrypt (ccm input &optional output)
-  (unless output
-    (setq output (make-vector8 (length input))))
-  (aes-ccm-mac-first ccm input)
-  (aes-ccm-mac-adata ccm)
-  (aes-ccm-cipher-copy ccm)
-  (aes-ccm-cipher-first ccm)
-  (aes-ccm-decrypt-loop ccm input output)
-  (values output (aes-ccm-cipher-tag ccm)))
+  (let ((output (aes-ccm-cipher ccm input output)))
+    (aes-ccm-decrypt-loop ccm input output)
+    (values output (aes-ccm-tag ccm))))
 
 
-;;
-;;  GCM
-;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;  AES-GCM
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defstruct aes-gcm
+  (aes (make-aes128))
+  (key (make-vector8 32))
+  (nonce (make-vector8 12))   ;; any length
+  (first (make-vector8 16))
+  (h 0)
+  (y 0)
+  (y0 0)
+  (hash 0)
   (adata nil))
 
+(defun make-aes-gcm-128 ()
+  (let* ((gcm (make-aes-gcm))
+         (aes (aes-gcm-aes gcm)))
+    (init-aes128 aes)
+    gcm))
+
+(defun make-aes-gcm-192 ()
+  (let* ((gcm (make-aes-gcm))
+         (aes (aes-gcm-aes gcm)))
+    (init-aes192 aes)
+    gcm))
+
+(defun make-aes-gcm-256 ()
+  (let* ((gcm (make-aes-gcm))
+         (aes (aes-gcm-aes gcm)))
+    (init-aes256 aes)
+    gcm))
+
+(defun aes-gcm-setkey (gcm)
+  (let* ((aes (aes-gcm-aes gcm))
+         (key (aes-key aes)))
+    (setf (subseq key 0 32) (aes-gcm-key gcm))
+    (aes-setkey aes)))
+
+;;  multiple
 (defconstant +aes-gcm-multiple-r+ (ash #xE1 120))
 
 (defun aes-gcm-multiple (x y)
-  (let ((z 0) (v y))
+  (let ((z 0) (v x))
     (dotimes (i 128)
       ;;  z
-      (when (logbitp (- 127 i) x)
+      (when (logbitp (- 127 i) y)
         (setq z (logxor z v)))
       ;;  v
-      (setq v (ash v -1))
-      (when (logbitp 0 v)
-        (setq v (logxor v +aes-gcm-multiple-r+))))
+      (if (logbitp 0 v)
+        (setq v (logxor (ash v -1) +aes-gcm-multiple-r+))
+        (setq v (ash v -1))))
     z))
+
+;;  ghash
+(defun aes-gcm-ghash (v h input n m)
+  (let* ((x (* n 16))
+         (y (+ x m))
+         (shift (* 8 (- 16 m)))
+         (w (vector-big-integer input :start x :end y))
+         (z (ash w shift)))
+    (aes-gcm-multiple (logxor v z) h)))
+
+(defun aes-gcm-ghash-input (h input size &optional (v 0))
+  (multiple-value-bind (n m) (truncate size 16)
+    (dotimes (i n)
+      (setq v (aes-gcm-ghash v h input i 16)))
+    (unless (zerop m)
+      (setq v (aes-gcm-ghash v h input n m))))
+  v)
+
+;;  first
+(defun aes-gcm-counter (gcm y)
+  (let* ((aes (aes-gcm-aes gcm))
+         (state (aes-state aes)))
+    (setf-integer-big-vector state y)
+    (aes-cipher1 aes)
+    (vector-big-integer state)))
+
+(defun aes-gcm-counter-y (gcm)
+  (let* ((y1 (aes-gcm-y gcm))
+         (y2 (1+ (ldb (byte 32 0) y1)))
+         (y3 (dpb y2 (byte 32 0) y1)))
+    (setf (aes-gcm-y gcm) y3)
+    (aes-gcm-counter gcm y3)))
+
+(defun aes-gcm-make-h (gcm)
+  (setf (aes-gcm-h gcm) (aes-gcm-counter gcm 0)))
+
+(defun aes-gcm-make-first-y (gcm input)
+  (let* ((h (aes-gcm-h gcm))
+         (size-byte (length input))
+         (size-bit (* size-byte 8))
+         (v (aes-gcm-ghash-input h input size-byte)))
+    (aes-gcm-multiple (logxor v size-bit) h)))
+
+(defun aes-gcm-make-first (gcm)
+  (let* ((nonce (aes-gcm-nonce gcm))
+         (y (if (= (length nonce) 12)
+              (logior (ash (vector-big-integer nonce) 32) 1)
+              (aes-gcm-make-first-y gcm nonce))))
+    (setf (aes-gcm-y0 gcm) y)
+    (setf (aes-gcm-y gcm) y)))
+
+(defun aes-gcm-cipher-adata (gcm)
+  (let* ((adata (aes-gcm-adata gcm))
+         (size (length adata))
+         (h (aes-gcm-h gcm)))
+    (setf (aes-gcm-hash gcm) (aes-gcm-ghash-input h adata size))))
+
+;;  cipher
+(defun aes-gcm-cipher-send1 (gcm input n m)
+  (let ((h (aes-gcm-h gcm))
+        (v (aes-gcm-hash gcm)))
+    (setq v (aes-gcm-ghash v h input n m))
+    (setf (aes-gcm-hash gcm) v)))
+
+(defun aes-gcm-cipher-send2 (gcm input n m output)
+  (let* ((e (aes-gcm-counter-y gcm))
+         (x (* n 16))
+         (y (+ x m))
+         (shift (* 8 (- 16 m)))
+         (w (vector-big-integer input :start x :end y))
+         (v (ash w shift))
+         (r (logxor e v)))
+    (setf (subseq output x y) (integer-big-vector r 16))))
+
+(defun aes-gcm-encrypt-loop (gcm input output)
+  (let ((size (length input)))
+    (multiple-value-bind (n m) (truncate size 16)
+      (dotimes (i n)
+        (aes-gcm-cipher-send2 gcm input i 16 output)
+        (aes-gcm-cipher-send1 gcm output i 16))
+      (unless (zerop m)
+        (aes-gcm-cipher-send2 gcm input n m output)
+        (aes-gcm-cipher-send1 gcm output n m)))))
+
+(defun aes-gcm-decrypt-loop (gcm input output)
+  (let ((size (length input)))
+    (multiple-value-bind (n m) (truncate size 16)
+      (dotimes (i n)
+        (aes-gcm-cipher-send1 gcm input i 16)
+        (aes-gcm-cipher-send2 gcm input i 16 output))
+      (unless (zerop m)
+        (aes-gcm-cipher-send1 gcm input n m)
+        (aes-gcm-cipher-send2 gcm input n m output)))))
+
+;;  tag
+(defun aes-gcm-tag-hash (gcm input)
+  (let* ((h (aes-gcm-h gcm))
+         (v (aes-gcm-hash gcm))
+         (adata (aes-gcm-adata gcm))
+         (x (* (length adata) 8))  ;; bit length
+         (y (* (length input) 8))  ;; bit length
+         (len (dpb x (byte 64 64) y)))
+    (aes-gcm-multiple (logxor v len) h)))
+
+(defun aes-gcm-tag (gcm input)
+  (let* ((y0 (aes-gcm-y0 gcm))
+         (e (aes-gcm-counter gcm y0))
+         (h (aes-gcm-tag-hash gcm input))
+         (v (logxor e h)))
+    (integer-big-vector v 16)))
+
+;;  encrypt
+(defun aes-gcm-cipher (gcm input output)
+  (unless output
+    (setq output (make-vector8 (length input))))
+  (aes-gcm-make-h gcm)
+  (aes-gcm-make-first gcm)
+  (aes-gcm-cipher-adata gcm)
+  output)
+
+(defun aes-gcm-encrypt (gcm input &optional output)
+  (let ((output (aes-gcm-cipher gcm input output)))
+    (aes-gcm-encrypt-loop gcm input output)
+    (values output (aes-gcm-tag gcm input))))
+
+(defun aes-gcm-decrypt (gcm input &optional output)
+  (let ((output (aes-gcm-cipher gcm input output)))
+    (aes-gcm-decrypt-loop gcm input output)
+    (values output (aes-gcm-tag gcm input))))
 
