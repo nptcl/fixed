@@ -707,53 +707,35 @@
       (setq v (aes-gcm-multiple-shift v)))
     z))
 
-(defun aes-gcm-table1-make (gcm)
+;;  table0
+(defun aes-gcm-table0-make (gcm)
   (declare (ignore gcm)))
 
-(defun aes-gcm-table1-ghash (gcm v)
+(defun aes-gcm-table0-ghash (gcm v)
   (let ((h (aes-gcm-h gcm)))
     (aes-gcm-multiple v h)))
 
-;;  table8
-(defun aes-gcm-table8-shift (a h)
-  (setf (aref a 0 128) h)
-  (loop for i from 1 below 128
-        do (multiple-value-bind (n m) (truncate i 8)
-             (setq h (aes-gcm-multiple-shift h))
-             (setf (aref a n (ash 1 (- 8 m 1))) h))))
+;;  table1
+(defun aes-gcm-table1-shift (a h)
+  (dotimes (i 128)
+    (setf (aref a i) h)
+    (setq h (aes-gcm-multiple-shift h))))
 
-(defun aes-gcm-table8-xor (a)
-  (do ((i 2 (* 2 i)))
-    ((<= 256 i))
-    (do ((k 1 (1+ k)))
-      ((<= i k))
-      (let ((ik (+ i k)))
-        (dotimes (x 16)
-          (let ((y (aref a x i))
-                (z (aref a x k)))
-            (setf (aref a x ik) (logxor y z))))))))
-
-(defun aes-gcm-table8-zero (a)
-  (dotimes (i 16)
-    (setf (aref a i 0) 0)))
-
-(defun aes-gcm-table8-make (gcm)
+(defun aes-gcm-table1-make (gcm)
   (let ((a (aes-gcm-table gcm))
         (h (aes-gcm-h gcm)))
     (unless a
-      (setq a (make-array '(16 256) :element-type '(unsigned-byte 128)))
+      (setq a (make-array 128 :element-type '(unsigned-byte 128)))
       (setf (aes-gcm-table gcm) a))
-    (aes-gcm-table8-shift a h)
-    (aes-gcm-table8-xor a)
-    (aes-gcm-table8-zero a)))
+    (aes-gcm-table1-shift a h)))
 
-(defun aes-gcm-table8-ghash (gcm v)
-  (let ((a (aes-gcm-table gcm))
-        (z 0))
-    (dotimes (x 16)
-      (let* ((r (- 16 x 1))
-             (y (ldb (byte 8 (* 8 r)) v)))
-        (setq z (logxor z (aref a x y)))))
+(defun aes-gcm-table1-ghash (gcm v)
+  (let* ((a (aes-gcm-table gcm))
+         (z 0))
+    (dotimes (i 128)
+      (when (logbitp (- 127 i) v)
+        (let ((h (aref a i)))
+          (setq z (logxor z h)))))
     z))
 
 ;;  table4
@@ -798,15 +780,59 @@
         (setq z (logxor z (aref a x y)))))
     z))
 
+;;  table8
+(defun aes-gcm-table8-shift (a h)
+  (setf (aref a 0 128) h)
+  (loop for i from 1 below 128
+        do (multiple-value-bind (n m) (truncate i 8)
+             (setq h (aes-gcm-multiple-shift h))
+             (setf (aref a n (ash 1 (- 8 m 1))) h))))
+
+(defun aes-gcm-table8-xor (a)
+  (do ((i 2 (* 2 i)))
+    ((<= 256 i))
+    (do ((k 1 (1+ k)))
+      ((<= i k))
+      (let ((ik (+ i k)))
+        (dotimes (x 16)
+          (let ((y (aref a x i))
+                (z (aref a x k)))
+            (setf (aref a x ik) (logxor y z))))))))
+
+(defun aes-gcm-table8-zero (a)
+  (dotimes (i 16)
+    (setf (aref a i 0) 0)))
+
+(defun aes-gcm-table8-make (gcm)
+  (let ((a (aes-gcm-table gcm))
+        (h (aes-gcm-h gcm)))
+    (unless a
+      (setq a (make-array '(16 256) :element-type '(unsigned-byte 128)))
+      (setf (aes-gcm-table gcm) a))
+    (aes-gcm-table8-shift a h)
+    (aes-gcm-table8-xor a)
+    (aes-gcm-table8-zero a)))
+
+(defun aes-gcm-table8-ghash (gcm v)
+  (let ((a (aes-gcm-table gcm))
+        (z 0))
+    (dotimes (x 16)
+      (let* ((r (- 16 x 1))
+             (y (ldb (byte 8 (* 8 r)) v)))
+        (setq z (logxor z (aref a x y)))))
+    z))
+
 ;;  table
-(defun aes-gcm-make-table (gcm)
+(defun aes-gcm-table-make (gcm)
   (ecase *aes-gcm-mode*
+    (table0 (aes-gcm-table0-make gcm))
     (table1 (aes-gcm-table1-make gcm))
     (table4 (aes-gcm-table4-make gcm))
     (table8 (aes-gcm-table8-make gcm))))
 
 (defun aes-gcm-ghash (gcm v)
   (ecase *aes-gcm-mode*
+    (table0 (aes-gcm-table0-ghash gcm v))
     (table1 (aes-gcm-table1-ghash gcm v))
     (table4 (aes-gcm-table4-ghash gcm v))
     (table8 (aes-gcm-table8-ghash gcm v))))
@@ -846,7 +872,7 @@
 ;;  first
 (defun aes-gcm-make-h (gcm)
   (setf (aes-gcm-h gcm) (aes-gcm-counter gcm 0))
-  (aes-gcm-make-table gcm))
+  (aes-gcm-table-make gcm))
 
 (defun aes-gcm-make-first-y (gcm input)
   (let* ((size-byte (length input))
