@@ -322,6 +322,14 @@
 ;;
 ;;  aes-gcm
 ;;
+(deftest aes-gcm-counter.1
+  (let ((g (make-aes-gcm-128)))
+    (setf (aes::aes-gcm-y g) #xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+    (aes::aes-gcm-counter-y g)
+    (aes::aes-gcm-y g))
+  #xFFFFFFFFFFFFFFFFFFFFFFFF00000000)
+
+;;  1
 (deftest aes-gcm-testcase-1.1
   (let* ((g (make-aes-gcm-128))
          (key (aes-gcm-key g)))
@@ -342,6 +350,7 @@
   #()
   #.(test-genarray "58e2fccefa7e3061367f1d57a4e7455a"))
 
+;;  2
 (deftest aes-gcm-testcase-2.1
   (let* ((g (make-aes-gcm-128))
          (key (aes-gcm-key g)))
@@ -362,6 +371,7 @@
   #.(test-genarray "00000000000000000000000000000000")
   #.(test-genarray "ab6e47d42cec13bdf53a67b21257bddf"))
 
+;;  3
 (defparameter aes-gcm-testcase-3-input
   (test-genarray "d9313225f88406e5a55909c5aff5269a"
                  "86a7a9531534f7da2e4c303d8a318a72"
@@ -394,6 +404,7 @@
   #.aes-gcm-testcase-3-input
   #.(test-genarray "4d5c2af327cd64a62cf35abd2ba6fab4"))
 
+;;  4
 (defparameter aes-gcm-testcase-4-input
   (test-genarray "d9313225f88406e5a55909c5aff5269a"
                  "86a7a9531534f7da2e4c303d8a318a72"
@@ -430,6 +441,7 @@
   #.aes-gcm-testcase-4-input
   #.(test-genarray "5bc94fbc3221a5db94fae95ae7121a47"))
 
+;;  5
 (defparameter aes-gcm-testcase-5-input
   (test-genarray "d9313225f88406e5a55909c5aff5269a"
                  "86a7a9531534f7da2e4c303d8a318a72"
@@ -466,6 +478,7 @@
   #.aes-gcm-testcase-5-input
   #.(test-genarray "3612d2e79e3b0785561be14aaca2fccb"))
 
+;;  6
 (defparameter aes-gcm-testcase-6-input
   (test-genarray "d9313225f88406e5a55909c5aff5269a"
                  "86a7a9531534f7da2e4c303d8a318a72"
@@ -510,6 +523,214 @@
   #.aes-gcm-testcase-6-input
   #.(test-genarray "619cc5aefffe0bfa462af43c1699d050"))
 
+;;  7
+(deftest aes-gcm-testcase-7.1
+  (let* ((g (make-aes-gcm-192))
+         (key (aes-gcm-key g)))
+    (setf (subseq key 0 24) (test-genarray "00000000000000000000000000000000"
+                                           "0000000000000000"))
+    (setf (aes-gcm-nonce g) (test-genarray "000000000000000000000000"))
+    (aes-gcm-setkey g)
+    (aes-gcm-encrypt g #()))
+  #()
+  #.(test-genarray "cd33b28ac773f74ba00ed1f312572435"))
+
+(deftest aes-gcm-testcase-7.2
+  (let* ((g (make-aes-gcm-192))
+         (key (aes-gcm-key g)))
+    (setf (subseq key 0 24) (test-genarray "00000000000000000000000000000000"
+                                           "0000000000000000"))
+    (setf (aes-gcm-nonce g) (test-genarray "000000000000000000000000"))
+    (aes-gcm-setkey g)
+    (aes-gcm-decrypt g #()))
+  #()
+  #.(test-genarray "cd33b28ac773f74ba00ed1f312572435"))
+
+;;  8
+(deftest aes-gcm-testcase-8.1
+  (let* ((g (make-aes-gcm-192))
+         (key (aes-gcm-key g)))
+    (setf (subseq key 0 24) (test-genarray "00000000000000000000000000000000"
+                                           "0000000000000000"))
+    (setf (aes-gcm-nonce g) (test-genarray "000000000000000000000000"))
+    (aes-gcm-setkey g)
+    (aes-gcm-encrypt g (test-genarray "00000000000000000000000000000000")))
+  #.(test-genarray "98e7247c07f0fe411c267e4384b0f600")
+  #.(test-genarray "2ff58d80033927ab8ef4d4587514f0fb"))
+
+(deftest aes-gcm-testcase-8.2
+  (let* ((g (make-aes-gcm-192))
+         (key (aes-gcm-key g)))
+    (setf (subseq key 0 24) (test-genarray "00000000000000000000000000000000"
+                                           "0000000000000000"))
+    (setf (aes-gcm-nonce g) (test-genarray "000000000000000000000000"))
+    (aes-gcm-setkey g)
+    (aes-gcm-decrypt g (test-genarray "98e7247c07f0fe411c267e4384b0f600")))
+  #.(test-genarray "00000000000000000000000000000000")
+  #.(test-genarray "2ff58d80033927ab8ef4d4587514f0fb"))
+
+;;  9
+(defparameter aes-gcm-testcase-9-input
+  (test-genarray "d9313225f88406e5a55909c5aff5269a"
+                 "86a7a9531534f7da2e4c303d8a318a72"
+                 "1c3c0c95956809532fcf0e2449a6b525"
+                 "b16aedf5aa0de657ba637b391aafd255"))
+
+(defparameter aes-gcm-testcase-9-output
+  (test-genarray "3980ca0b3c00e841eb06fac4872a2757"
+                 "859e1ceaa6efd984628593b40ca1e19c"
+                 "7d773d00c144c525ac619d18c84a3f47"
+                 "18e2448b2fe324d9ccda2710acade256"))
+
+(deftest aes-gcm-testcase-9.1
+  (let* ((g (make-aes-gcm-192))
+         (key (aes-gcm-key g)))
+    (setf (subseq key 0 24) (test-genarray "feffe9928665731c6d6a8f9467308308"
+                                           "feffe9928665731c"))
+    (setf (aes-gcm-nonce g) (test-genarray "cafebabefacedbaddecaf888"))
+    (aes-gcm-setkey g)
+    (aes-gcm-encrypt g aes-gcm-testcase-9-input))
+  #.aes-gcm-testcase-9-output
+  #.(test-genarray "9924a7c8587336bfb118024db8674a14"))
+
+(deftest aes-gcm-testcase-9.2
+  (let* ((g (make-aes-gcm-192))
+         (key (aes-gcm-key g)))
+    (setf (subseq key 0 24) (test-genarray "feffe9928665731c6d6a8f9467308308"
+                                           "feffe9928665731c"))
+    (setf (aes-gcm-nonce g) (test-genarray "cafebabefacedbaddecaf888"))
+    (aes-gcm-setkey g)
+    (aes-gcm-decrypt g aes-gcm-testcase-9-output))
+  #.aes-gcm-testcase-9-input
+  #.(test-genarray "9924a7c8587336bfb118024db8674a14"))
+
+;;  10
+(defparameter aes-gcm-testcase-10-input
+  (test-genarray "d9313225f88406e5a55909c5aff5269a"
+                 "86a7a9531534f7da2e4c303d8a318a72"
+                 "1c3c0c95956809532fcf0e2449a6b525"
+                 "b16aedf5aa0de657ba637b39"))
+
+(defparameter aes-gcm-testcase-10-output
+  (test-genarray "3980ca0b3c00e841eb06fac4872a2757"
+                 "859e1ceaa6efd984628593b40ca1e19c"
+                 "7d773d00c144c525ac619d18c84a3f47"
+                 "18e2448b2fe324d9ccda2710"))
+
+(deftest aes-gcm-testcase-10.1
+  (let* ((g (make-aes-gcm-192))
+         (key (aes-gcm-key g)))
+    (setf (subseq key 0 24) (test-genarray "feffe9928665731c6d6a8f9467308308"
+                                           "feffe9928665731c"))
+    (setf (aes-gcm-nonce g) (test-genarray "cafebabefacedbaddecaf888"))
+    (setf (aes-gcm-adata g) (test-genarray "feedfacedeadbeeffeedfacedeadbeef"
+                                           "abaddad2"))
+    (aes-gcm-setkey g)
+    (aes-gcm-encrypt g aes-gcm-testcase-10-input))
+  #.aes-gcm-testcase-10-output
+  #.(test-genarray "2519498e80f1478f37ba55bd6d27618c"))
+
+(deftest aes-gcm-testcase-10.2
+  (let* ((g (make-aes-gcm-192))
+         (key (aes-gcm-key g)))
+    (setf (subseq key 0 24) (test-genarray "feffe9928665731c6d6a8f9467308308"
+                                           "feffe9928665731c"))
+    (setf (aes-gcm-nonce g) (test-genarray "cafebabefacedbaddecaf888"))
+    (setf (aes-gcm-adata g) (test-genarray "feedfacedeadbeeffeedfacedeadbeef"
+                                           "abaddad2"))
+    (aes-gcm-setkey g)
+    (aes-gcm-decrypt g aes-gcm-testcase-10-output))
+  #.aes-gcm-testcase-10-input
+  #.(test-genarray "2519498e80f1478f37ba55bd6d27618c"))
+
+;;  11
+(defparameter aes-gcm-testcase-11-input
+  (test-genarray "d9313225f88406e5a55909c5aff5269a"
+                 "86a7a9531534f7da2e4c303d8a318a72"
+                 "1c3c0c95956809532fcf0e2449a6b525"
+                 "b16aedf5aa0de657ba637b39"))
+
+(defparameter aes-gcm-testcase-11-output
+  (test-genarray "0f10f599ae14a154ed24b36e25324db8"
+                 "c566632ef2bbb34f8347280fc4507057"
+                 "fddc29df9a471f75c66541d4d4dad1c9"
+                 "e93a19a58e8b473fa0f062f7"))
+
+(deftest aes-gcm-testcase-11.1
+  (let* ((g (make-aes-gcm-192))
+         (key (aes-gcm-key g)))
+    (setf (subseq key 0 24) (test-genarray "feffe9928665731c6d6a8f9467308308"
+                                           "feffe9928665731c"))
+    (setf (aes-gcm-nonce g) (test-genarray "cafebabefacedbad"))
+    (setf (aes-gcm-adata g) (test-genarray "feedfacedeadbeeffeedfacedeadbeef"
+                                           "abaddad2"))
+    (aes-gcm-setkey g)
+    (aes-gcm-encrypt g aes-gcm-testcase-11-input))
+  #.aes-gcm-testcase-11-output
+  #.(test-genarray "65dcc57fcf623a24094fcca40d3533f8"))
+
+(deftest aes-gcm-testcase-11.2
+  (let* ((g (make-aes-gcm-192))
+         (key (aes-gcm-key g)))
+    (setf (subseq key 0 24) (test-genarray "feffe9928665731c6d6a8f9467308308"
+                                           "feffe9928665731c"))
+    (setf (aes-gcm-nonce g) (test-genarray "cafebabefacedbad"))
+    (setf (aes-gcm-adata g) (test-genarray "feedfacedeadbeeffeedfacedeadbeef"
+                                           "abaddad2"))
+    (aes-gcm-setkey g)
+    (aes-gcm-decrypt g aes-gcm-testcase-11-output))
+  #.aes-gcm-testcase-11-input
+  #.(test-genarray "65dcc57fcf623a24094fcca40d3533f8"))
+
+;;  12
+(defparameter aes-gcm-testcase-12-input
+  (test-genarray "d9313225f88406e5a55909c5aff5269a"
+                 "86a7a9531534f7da2e4c303d8a318a72"
+                 "1c3c0c95956809532fcf0e2449a6b525"
+                 "b16aedf5aa0de657ba637b39"))
+
+(defparameter aes-gcm-testcase-12-output
+  (test-genarray "d27e88681ce3243c4830165a8fdcf9ff"
+                 "1de9a1d8e6b447ef6ef7b79828666e45"
+                 "81e79012af34ddd9e2f037589b292db3"
+                 "e67c036745fa22e7e9b7373b"))
+
+(deftest aes-gcm-testcase-12.1
+  (let* ((g (make-aes-gcm-192))
+         (key (aes-gcm-key g)))
+    (setf (subseq key 0 24) (test-genarray "feffe9928665731c6d6a8f9467308308"
+                                           "feffe9928665731c"))
+    (setf (aes-gcm-nonce g) (test-genarray "9313225df88406e555909c5aff5269aa"
+                                           "6a7a9538534f7da1e4c303d2a318a728"
+                                           "c3c0c95156809539fcf0e2429a6b5254"
+                                           "16aedbf5a0de6a57a637b39b"))
+    (setf (aes-gcm-adata g) (test-genarray "feedfacedeadbeeffeedfacedeadbeef"
+                                           "abaddad2"))
+    (aes-gcm-setkey g)
+    (aes-gcm-encrypt g aes-gcm-testcase-12-input))
+  #.aes-gcm-testcase-12-output
+  #.(test-genarray "dcf566ff291c25bbb8568fc3d376a6d9"))
+
+(deftest aes-gcm-testcase-12.2
+  (let* ((g (make-aes-gcm-192))
+         (key (aes-gcm-key g)))
+    (setf (subseq key 0 24) (test-genarray "feffe9928665731c6d6a8f9467308308"
+                                           "feffe9928665731c"))
+    (setf (aes-gcm-nonce g) (test-genarray "9313225df88406e555909c5aff5269aa"
+                                           "6a7a9538534f7da1e4c303d2a318a728"
+                                           "c3c0c95156809539fcf0e2429a6b5254"
+                                           "16aedbf5a0de6a57a637b39b"))
+    (setf (aes-gcm-adata g) (test-genarray "feedfacedeadbeeffeedfacedeadbeef"
+                                           "abaddad2"))
+    (aes-gcm-setkey g)
+    (aes-gcm-decrypt g aes-gcm-testcase-12-output))
+  #.aes-gcm-testcase-12-input
+  #.(test-genarray "dcf566ff291c25bbb8568fc3d376a6d9"))
+
+
+;;
+;;  aes-gcm.pdf
+;;
 (deftest aes-gcm-128.1
   (let* ((g (make-aes-gcm-128))
          (key (aes-gcm-key g)))
